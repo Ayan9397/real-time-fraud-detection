@@ -1,295 +1,473 @@
 from pathlib import Path
+import sys
+import time
+
 import joblib
 import mlflow
 import mlflow.pyfunc
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 # ============================================================
-# PROJECT PATHS
+# PROJECT CONFIGURATION
 # ============================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-MODEL_DIR = PROJECT_ROOT / "models"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-MODEL_PATH = MODEL_DIR / "xgboost_missing_model.joblib"
-PREPROCESSOR_PATH = MODEL_DIR / "xgboost_missing_preprocessor.joblib"
+
+MODEL_PATH = (
+    PROJECT_ROOT
+    / "models"
+    / "xgboost_missing_model.joblib"
+)
+
+PREPROCESSOR_PATH = (
+    PROJECT_ROOT
+    / "models"
+    / "xgboost_missing_preprocessor.joblib"
+)
 
 MLFLOW_DB = PROJECT_ROOT / "mlflow.db"
 
 EXPERIMENT_NAME = "fraud-detection-modeling"
-REGISTERED_MODEL_NAME = "fraud_detection_xgboost"
 
+MODEL_NAME = "fraud_detection_xgboost"
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
+MODEL_VERSION = "3"
 
 THRESHOLD = 0.60
 
 
 # ============================================================
-# CUSTOM MLflow PYFUNC MODEL
+# CUSTOM MLFLOW PYTHON MODEL
 # ============================================================
 
 class FraudDetectionModel(mlflow.pyfunc.PythonModel):
     """
-    Complete fraud detection inference pipeline.
+    MLflow wrapper for the missingness-aware XGBoost model.
 
-    Pipeline:
+    Training schema:
+        432 original features
+        + 432 missingness indicators
+        = 864 features total
 
-        Raw transaction
-              ↓
-        Missingness indicators
-              ↓
-        Saved preprocessor
-              ↓
-        XGBoost model
-              ↓
-        Fraud probability
+    The wrapper receives only the original transaction features
+    and creates the missingness indicators automatically.
     """
 
     def load_context(self, context):
 
-        self.model = joblib.load(context.artifacts["model"])
+        self.model = joblib.load(
+            context.artifacts["model"]
+        )
 
         self.preprocessor = joblib.load(
             context.artifacts["preprocessor"]
         )
 
-        self.threshold = THRESHOLD
-
-    def _add_missing_indicators(self, df):
-
-        df = df.copy()
-
-        original_columns = list(df.columns)
-
-        for column in original_columns:
-            indicator_name = f"{column}_missing"
-
-            if indicator_name not in df.columns:
-                df[indicator_name] = df[column].isna().astype("int8")
-
-        return df
-
-    def predict(self, context, model_input):
-
-        if not isinstance(model_input, pd.DataFrame):
-            model_input = pd.DataFrame(model_input)
-
-        df = model_input.copy()
-
         # ----------------------------------------------------
-        # Remove columns that are not model features
+        # The preprocessor already expects 864 features:
+        #
+        # 432 original
+        # + 432 missing indicators
         # ----------------------------------------------------
 
-        columns_to_drop = []
+        self.expected_features = list(
+            self.preprocessor.feature_names_in_
+        )
 
-        for column in ["isFraud", "TransactionID"]:
-            if column in df.columns:
-                columns_to_drop.append(column)
+        self.missing_features = [
+            feature
+            for feature in self.expected_features
+            if feature.endswith("_missing")
+        ]
 
-        if columns_to_drop:
-            df = df.drop(columns=columns_to_drop)
+        self.original_features = [
+            feature
+            for feature in self.expected_features
+            if not feature.endswith("_missing")
+        ]
+
+        # Safety checks.
+        if len(self.original_features) != 432:
+            raise RuntimeError(
+                "Unexpected original feature count: "
+                f"{len(self.original_features)}. "
+                "Expected 432."
+            )
+
+        if len(self.missing_features) != 432:
+            raise RuntimeError(
+                "Unexpected missing-indicator count: "
+                f"{len(self.missing_features)}. "
+                "Expected 432."
+            )
+
+        if len(self.expected_features) != 864:
+            raise RuntimeError(
+                "Unexpected total feature count: "
+                f"{len(self.expected_features)}. "
+                "Expected 864."
+            )
+
+    # --------------------------------------------------------
+    # Prepare input
+    # --------------------------------------------------------
+
+    def _prepare_input(self, model_input):
+
+        if isinstance(model_input, dict):
+
+            dataframe = pd.DataFrame(
+                [model_input]
+            )
+
+        elif isinstance(model_input, pd.Series):
+
+            dataframe = model_input.to_frame().T
+
+        elif isinstance(model_input, pd.DataFrame):
+
+            dataframe = model_input.copy()
+
+        else:
+
+            raise TypeError(
+                "model_input must be a dictionary, "
+                "pandas Series, or pandas DataFrame."
+            )
 
         # ----------------------------------------------------
-        # Add missingness indicators
+        # Remove target and identifier.
         # ----------------------------------------------------
 
-        df = self._add_missing_indicators(df)
+        dataframe = dataframe.drop(
+            columns=[
+                "isFraud",
+                "TransactionID",
+            ],
+            errors="ignore",
+        )
 
         # ----------------------------------------------------
-        # Transform features
+        # Build original 432 features.
+        #
+        # Missing features use np.nan.
         # ----------------------------------------------------
 
-        X = self.preprocessor.transform(df)
+        prepared_data = {
+            feature: (
+                dataframe[feature].iloc[0]
+                if feature in dataframe.columns
+                else np.nan
+            )
+            for feature in self.original_features
+        }
+
+        original_dataframe = pd.DataFrame(
+            [prepared_data],
+            columns=self.original_features,
+        )
 
         # ----------------------------------------------------
-        # Generate fraud probability
+        # Create exactly 432 missingness indicators.
         # ----------------------------------------------------
 
-        probabilities = self.model.predict_proba(X)[:, 1]
+        missing_indicators = (
+            original_dataframe
+            .isna()
+            .astype(np.int8)
+        )
+
+        missing_indicators.columns = [
+            f"{feature}_missing"
+            for feature in self.original_features
+        ]
 
         # ----------------------------------------------------
-        # Apply production decision threshold
+        # Combine 432 original + 432 indicators.
         # ----------------------------------------------------
 
-        predictions = (probabilities >= self.threshold).astype(int)
+        prepared_dataframe = pd.concat(
+            [
+                original_dataframe,
+                missing_indicators,
+            ],
+            axis=1,
+        )
+
+        # ----------------------------------------------------
+        # Match the exact training feature order.
+        # ----------------------------------------------------
+
+        prepared_dataframe = prepared_dataframe[
+            self.expected_features
+        ]
+
+        return prepared_dataframe
+
+    # --------------------------------------------------------
+    # Prediction
+    # --------------------------------------------------------
+
+    def predict(
+        self,
+        context,
+        model_input,
+    ):
+
+        start_time = time.perf_counter()
+
+        dataframe = self._prepare_input(
+            model_input
+        )
+
+        transformed = self.preprocessor.transform(
+            dataframe
+        )
+
+        probabilities = (
+            self.model.predict_proba(
+                transformed
+            )[:, 1]
+        )
+
+        predictions = (
+            probabilities >= THRESHOLD
+        )
+
+        decisions = np.where(
+            predictions,
+            "FRAUD REVIEW",
+            "LEGITIMATE",
+        )
+
+        inference_latency_ms = (
+            time.perf_counter() - start_time
+        ) * 1000
 
         return pd.DataFrame(
             {
                 "fraud_probability": probabilities,
                 "fraud_prediction": predictions,
-                "decision": np.where(
-                    predictions == 1,
-                    "FRAUD REVIEW",
-                    "LEGITIMATE"
+                "decision": decisions,
+                "threshold": THRESHOLD,
+                "prediction_latency_ms": (
+                    inference_latency_ms
                 ),
             }
         )
 
 
 # ============================================================
-# MAIN
+# CREATE MLFLOW MODEL
 # ============================================================
 
 def main():
 
     print("=" * 70)
-    print("CREATING MLflow DEPLOYABLE FRAUD MODEL")
+    print("CREATE MLFLOW FRAUD DETECTION MODEL")
     print("=" * 70)
-
-    print("\nProject root:")
-    print(PROJECT_ROOT)
-
-    print("\nChecking model files...")
+    print()
 
     if not MODEL_PATH.exists():
+
         raise FileNotFoundError(
-            f"XGBoost model not found: {MODEL_PATH}"
+            f"Model not found: {MODEL_PATH}"
         )
 
     if not PREPROCESSOR_PATH.exists():
+
         raise FileNotFoundError(
-            f"Preprocessor not found: {PREPROCESSOR_PATH}"
+            f"Preprocessor not found: "
+            f"{PREPROCESSOR_PATH}"
         )
 
-    print("XGBoost model:", MODEL_PATH)
-    print("Preprocessor:", PREPROCESSOR_PATH)
-
     # --------------------------------------------------------
-    # Configure MLflow
+    # Configure MLflow.
     # --------------------------------------------------------
 
-    tracking_uri = f"sqlite:///{MLFLOW_DB.as_posix()}"
+    tracking_uri = (
+        f"sqlite:///{MLFLOW_DB}"
+    )
 
-    print("\nConnecting to MLflow...")
-    print("Tracking URI:", tracking_uri)
+    mlflow.set_tracking_uri(
+        tracking_uri
+    )
 
-    mlflow.set_tracking_uri(tracking_uri)
+    print(
+        f"MLflow tracking URI: "
+        f"{tracking_uri}"
+    )
 
-    experiment = mlflow.get_experiment_by_name(
-        EXPERIMENT_NAME
+    print()
+
+    # --------------------------------------------------------
+    # Experiment.
+    # --------------------------------------------------------
+
+    experiment = (
+        mlflow.get_experiment_by_name(
+            EXPERIMENT_NAME
+        )
     )
 
     if experiment is None:
-        experiment_id = mlflow.create_experiment(
-            EXPERIMENT_NAME
+
+        experiment_id = (
+            mlflow.create_experiment(
+                EXPERIMENT_NAME
+            )
         )
+
     else:
-        experiment_id = experiment.experiment_id
 
-    mlflow.set_experiment(EXPERIMENT_NAME)
+        experiment_id = (
+            experiment.experiment_id
+        )
 
-    print("Experiment ID:", experiment_id)
+    mlflow.set_experiment(
+        EXPERIMENT_NAME
+    )
+
+    print(
+        f"Using experiment: "
+        f"{EXPERIMENT_NAME}"
+    )
+
+    print(
+        f"Experiment ID: "
+        f"{experiment_id}"
+    )
+
+    print()
 
     # --------------------------------------------------------
-    # Start MLflow run
+    # Start run.
     # --------------------------------------------------------
-
-    print("\nStarting MLflow run...")
 
     with mlflow.start_run(
-        run_name="xgboost-missingness-deployable"
+        run_name="champion_xgboost_pyfunc_v3"
     ) as run:
 
-        print("Run ID:", run.info.run_id)
+        run_id = run.info.run_id
 
-        # ----------------------------------------------------
-        # Log model configuration
-        # ----------------------------------------------------
-
-        mlflow.log_params(
-            {
-                "model_type": "XGBoost",
-                "feature_strategy": (
-                    "original_features_plus_missing_indicators"
-                ),
-                "original_features": 432,
-                "missing_indicators": 432,
-                "total_features_before_encoding": 864,
-                "threshold": THRESHOLD,
-                "deployment_model": True,
-            }
+        print(
+            f"MLflow Run ID: {run_id}"
         )
 
-        # ----------------------------------------------------
-        # Create sample input signature
-        # ----------------------------------------------------
+        print()
+        print("Logging MLflow model...")
 
-        sample_data = pd.DataFrame(
-            {
-                "TransactionDT": [100000],
-                "TransactionAmt": [100.0],
-                "ProductCD": ["W"],
-                "card1": [1000],
-                "card2": [100.0],
-                "card3": [150.0],
-                "card4": ["visa"],
-                "card5": [226.0],
-                "card6": ["debit"],
-                "addr1": [100.0],
-                "addr2": [87.0],
-                "dist1": [1.0],
-                "dist2": [np.nan],
-                "P_emaildomain": ["gmail.com"],
-                "R_emaildomain": [np.nan],
-            }
-        )
+        artifacts = {
+            "model": str(MODEL_PATH),
+            "preprocessor": str(
+                PREPROCESSOR_PATH
+            ),
+        }
 
-        # ----------------------------------------------------
-        # Log deployable MLflow model
-        # ----------------------------------------------------
-
-        print("\nLogging deployable MLflow model...")
-
-        model_info = mlflow.pyfunc.log_model(
+        mlflow.pyfunc.log_model(
             artifact_path="fraud_detection_model",
             python_model=FraudDetectionModel(),
-            artifacts={
-                "model": str(MODEL_PATH),
-                "preprocessor": str(PREPROCESSOR_PATH),
-            },
-            registered_model_name=REGISTERED_MODEL_NAME,
+            artifacts=artifacts,
+            registered_model_name=MODEL_NAME,
         )
 
-        print("\nModel logged successfully.")
-
-        print("Model URI:")
-        print(model_info.model_uri)
-
-        print("\nModel artifact URI:")
-        print(model_info.artifact_path)
-
-        print("\nRegistered model:")
-        print(REGISTERED_MODEL_NAME)
-
         # ----------------------------------------------------
-        # Tags
+        # Metadata.
         # ----------------------------------------------------
 
-        mlflow.set_tags(
+        mlflow.log_param(
+            "model_type",
+            "XGBoost",
+        )
+
+        mlflow.log_param(
+            "model_version",
+            MODEL_VERSION,
+        )
+
+        mlflow.log_param(
+            "threshold",
+            THRESHOLD,
+        )
+
+        mlflow.log_param(
+            "original_feature_count",
+            432,
+        )
+
+        mlflow.log_param(
+            "missing_indicator_count",
+            432,
+        )
+
+        mlflow.log_param(
+            "total_feature_count",
+            864,
+        )
+
+        mlflow.set_tag(
+            "model_role",
+            "champion",
+        )
+
+        mlflow.set_tag(
+            "deployment_stage",
+            "production_candidate",
+        )
+
+        mlflow.set_tag(
+            "architecture",
+            "XGBoost + missingness-aware preprocessing",
+        )
+
+        # ----------------------------------------------------
+        # Locked test metrics.
+        # ----------------------------------------------------
+
+        mlflow.log_metrics(
             {
-                "project": "real-time-fraud-detection",
-                "model_role": "deployable_champion",
-                "feature_engineering": "missingness_indicators",
-                "threshold": "0.60",
-                "test_set_locked": "true",
-                "preprocessing_included": "true",
-                "deployment_ready": "true",
+                "test_roc_auc": 0.8989,
+                "test_pr_auc": 0.5203,
+                "test_precision_at_060": 0.5522,
+                "test_recall_at_060": 0.4583,
+                "test_f1_at_060": 0.5009,
+                "test_fpr_at_060": 0.013404,
             }
         )
 
-    print("\n" + "=" * 70)
-    print("MLflow DEPLOYABLE MODEL CREATED")
-    print("=" * 70)
-
-    print("\nNext step:")
-    print("Verify the newly registered model using MLflow.")
-    print("=" * 70)
+        print()
+        print("=" * 70)
+        print("MLFLOW MODEL CREATED SUCCESSFULLY")
+        print("=" * 70)
+        print()
+        print(
+            f"Run ID: {run_id}"
+        )
+        print(
+            f"Model: {MODEL_NAME}"
+        )
+        print(
+            f"Original features: 432"
+        )
+        print(
+            f"Missing indicators: 432"
+        )
+        print(
+            f"Total features: 864"
+        )
+        print(
+            f"Threshold: {THRESHOLD}"
+        )
+        print()
+        print(
+            "MLflow model logging completed."
+        )
 
 
 if __name__ == "__main__":
