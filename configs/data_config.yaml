@@ -1,0 +1,11 @@
+dataset:
+  name: ieee-cis-fraud-detection
+
+  raw_directory: data/raw
+
+  transaction_file: train_transaction.csv
+  identity_file: train_identity.csv
+
+  target_column: isFraud
+
+  id_column: TransactionID
