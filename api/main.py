@@ -12,6 +12,10 @@ from src.cache.redis_client import RedisClient
 from src.database.connection import get_db
 
 
+# ============================================================
+# FastAPI Application
+# ============================================================
+
 app = FastAPI(
     title="Real-Time Fraud Detection API",
     description=(
@@ -19,9 +23,13 @@ app = FastAPI(
         "fraud risk scoring using XGBoost, MLflow, "
         "FastAPI, PostgreSQL, and Redis."
     ),
-    version="1.2.0",
+    version="2.0.0",
 )
 
+
+# ============================================================
+# Application Services
+# ============================================================
 
 model_service = FraudModelService()
 
@@ -33,21 +41,46 @@ fraud_cache = FraudCache(
 )
 
 
+# ============================================================
+# Health Check
+# ============================================================
+
 @app.get("/health")
-def health_check(db: Session = Depends(get_db)):
+def health_check(
+    db: Session = Depends(get_db),
+):
+    """
+    Check the health of:
+    - ML model
+    - PostgreSQL
+    - Redis
+    """
+
     database_status = "healthy"
     redis_status = "healthy"
+
+    # --------------------------------------------------------
+    # PostgreSQL health
+    # --------------------------------------------------------
 
     try:
         db.execute(text("SELECT 1"))
     except Exception:
         database_status = "unhealthy"
 
+    # --------------------------------------------------------
+    # Redis health
+    # --------------------------------------------------------
+
     try:
         if not redis_client.ping():
             redis_status = "unhealthy"
     except Exception:
         redis_status = "unhealthy"
+
+    # --------------------------------------------------------
+    # Overall status
+    # --------------------------------------------------------
 
     overall_status = (
         "healthy"
@@ -60,19 +93,52 @@ def health_check(db: Session = Depends(get_db)):
         "status": overall_status,
         "model": model_service.MODEL_NAME,
         "model_version": model_service.MODEL_VERSION,
-        "expected_features": len(model_service.expected_features),
+        "expected_features": len(
+            model_service.expected_features
+        ),
         "database": database_status,
         "redis": redis_status,
     }
 
+
+# ============================================================
+# Fraud Prediction Endpoint
+# ============================================================
 
 @app.post("/predict")
 def predict_fraud(
     transaction: FraudTransactionRequest,
     db: Session = Depends(get_db),
 ):
+    """
+    Predict fraud risk for a transaction.
+
+    Request flow:
+
+        Client
+          ↓
+        FastAPI
+          ↓
+        Redis cache
+          ↓
+        PostgreSQL
+          ↓
+        MLflow / XGBoost
+          ↓
+        PostgreSQL
+          ↓
+        Redis
+          ↓
+        Response
+    """
+
     request_start_time = time.perf_counter()
+
     transaction_id = transaction.TransactionID
+
+    # --------------------------------------------------------
+    # Validate TransactionID
+    # --------------------------------------------------------
 
     if transaction_id is None:
         raise HTTPException(
@@ -83,13 +149,18 @@ def predict_fraud(
     database_service = DatabaseService(db)
 
     try:
+        # ====================================================
+        # 1. Redis cache lookup
+        # ====================================================
+
         cached_prediction = fraud_cache.get_prediction(
             transaction_id
         )
 
         if cached_prediction is not None:
             total_latency_ms = (
-                time.perf_counter() - request_start_time
+                time.perf_counter()
+                - request_start_time
             ) * 1000
 
             return {
@@ -101,10 +172,17 @@ def predict_fraud(
                 ),
                 "database_persisted": True,
                 "cache_hit": True,
+                "database_hit": False,
             }
 
+        # ====================================================
+        # 2. PostgreSQL lookup
+        # ====================================================
+
         existing_transaction = (
-            database_service.get_transaction(transaction_id)
+            database_service.get_transaction(
+                transaction_id
+            )
         )
 
         if existing_transaction is not None:
@@ -125,7 +203,9 @@ def predict_fraud(
                 )
 
                 database_result = {
-                    "model": existing_prediction.model_name,
+                    "model": (
+                        existing_prediction.model_name
+                    ),
                     "model_version": (
                         existing_prediction.model_version
                     ),
@@ -136,7 +216,9 @@ def predict_fraud(
                     "fraud_prediction": bool(
                         existing_prediction.fraud_prediction
                     ),
-                    "decision": existing_prediction.decision,
+                    "decision": (
+                        existing_prediction.decision
+                    ),
                     "threshold": float(
                         existing_prediction.threshold
                     ),
@@ -145,13 +227,18 @@ def predict_fraud(
                     ),
                 }
 
+                # ------------------------------------------------
+                # Restore PostgreSQL result into Redis cache.
+                # ------------------------------------------------
+
                 fraud_cache.set_prediction(
                     transaction_id=transaction_id,
                     prediction=database_result,
                 )
 
                 total_latency_ms = (
-                    time.perf_counter() - request_start_time
+                    time.perf_counter()
+                    - request_start_time
                 ) * 1000
 
                 return {
@@ -166,89 +253,146 @@ def predict_fraud(
                     "database_hit": True,
                 }
 
+        # ====================================================
+        # 3. ML model inference
+        # ====================================================
+
         transaction_data = (
             transaction.to_transaction_dict()
         )
 
         inference_start_time = time.perf_counter()
 
-        result = model_service.predict(transaction_data)
+        result = model_service.predict(
+            transaction_data
+        )
 
         prediction_latency_ms = (
-            time.perf_counter() - inference_start_time
+            time.perf_counter()
+            - inference_start_time
         ) * 1000
+
+        # ====================================================
+        # 4. Prepare PostgreSQL transaction record
+        # ====================================================
 
         database_transaction_data = {
             "transaction_id": transaction_id,
-            "transaction_dt": int(transaction.TransactionDT),
-            "transaction_amt": float(transaction.TransactionAmt),
+            "transaction_dt": int(
+                transaction.TransactionDT
+            ),
+            "transaction_amt": float(
+                transaction.TransactionAmt
+            ),
             "product_cd": transaction.ProductCD,
+
             "card1": (
                 int(transaction.card1)
                 if transaction.card1 is not None
                 else None
             ),
+
             "card2": (
                 int(transaction.card2)
                 if transaction.card2 is not None
                 else None
             ),
+
             "card3": (
                 int(transaction.card3)
                 if transaction.card3 is not None
                 else None
             ),
+
             "card4": transaction.card4,
+
             "card5": (
                 int(transaction.card5)
                 if transaction.card5 is not None
                 else None
             ),
+
             "card6": transaction.card6,
+
             "addr1": (
                 int(transaction.addr1)
                 if transaction.addr1 is not None
                 else None
             ),
+
             "addr2": (
                 int(transaction.addr2)
                 if transaction.addr2 is not None
                 else None
             ),
+
             "dist1": transaction.dist1,
             "dist2": transaction.dist2,
-            "p_emaildomain": transaction.P_emaildomain,
-            "r_emaildomain": transaction.R_emaildomain,
+
+            "p_emaildomain": (
+                transaction.P_emaildomain
+            ),
+
+            "r_emaildomain": (
+                transaction.R_emaildomain
+            ),
+
             "actual_fraud": None,
         }
+
+        # ====================================================
+        # 5. Persist transaction
+        # ====================================================
 
         database_service.save_transaction(
             database_transaction_data
         )
 
-        threshold = 0.60
+        # ====================================================
+        # 6. Persist prediction
+        # ====================================================
+
+        threshold = model_service.THRESHOLD
 
         database_service.save_prediction(
             transaction_id=transaction_id,
             model_name=model_service.MODEL_NAME,
             model_version=model_service.MODEL_VERSION,
-            fraud_probability=result["fraud_probability"],
+            fraud_probability=(
+                result["fraud_probability"]
+            ),
             fraud_prediction=bool(
                 result["fraud_prediction"]
             ),
             decision=result["decision"],
             threshold=threshold,
-            prediction_latency_ms=prediction_latency_ms,
+            prediction_latency_ms=(
+                prediction_latency_ms
+            ),
         )
+
+        # ====================================================
+        # 7. Commit database transaction
+        # ====================================================
 
         database_service.commit()
 
+        # ====================================================
+        # 8. Prepare Redis cache result
+        # ====================================================
+
         cache_result = {
             "model": model_service.MODEL_NAME,
-            "model_version": model_service.MODEL_VERSION,
+            "model_version": (
+                model_service.MODEL_VERSION
+            ),
             "transaction_id": transaction_id,
-            "fraud_probability": result["fraud_probability"],
-            "fraud_prediction": result["fraud_prediction"],
+            "fraud_probability": (
+                result["fraud_probability"]
+            ),
+            "fraud_prediction": (
+                result["fraud_prediction"]
+            ),
             "decision": result["decision"],
             "threshold": threshold,
             "prediction_latency_ms": round(
@@ -257,14 +401,27 @@ def predict_fraud(
             ),
         }
 
+        # ====================================================
+        # 9. Write prediction to Redis
+        # ====================================================
+
         cache_written = fraud_cache.set_prediction(
             transaction_id=transaction_id,
             prediction=cache_result,
         )
 
+        # ====================================================
+        # 10. Calculate complete request latency
+        # ====================================================
+
         total_latency_ms = (
-            time.perf_counter() - request_start_time
+            time.perf_counter()
+            - request_start_time
         ) * 1000
+
+        # ====================================================
+        # 11. Return API response
+        # ====================================================
 
         return {
             "success": True,
@@ -279,9 +436,17 @@ def predict_fraud(
             "cache_written": cache_written,
         }
 
+    # ========================================================
+    # HTTP errors
+    # ========================================================
+
     except HTTPException:
         db.rollback()
         raise
+
+    # ========================================================
+    # Unexpected errors
+    # ========================================================
 
     except Exception as exc:
         db.rollback()

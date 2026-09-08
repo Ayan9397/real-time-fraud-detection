@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 
 import mlflow
 import numpy as np
@@ -6,32 +7,24 @@ import pandas as pd
 
 
 class FraudModelService:
-    """
-    Production inference service for the fraud detection model.
-
-    The model is managed and registered in MLflow. In the current
-    WSL development environment, the registered model resolves to
-    a Windows-backed local artifact, so the service loads that
-    verified MLflow model artifact directly.
-    """
-
     MODEL_NAME = "fraud_detection_xgboost"
-    MODEL_VERSION = "2"
+    MODEL_VERSION = "4"
     THRESHOLD = 0.60
-
-    MODEL_ID = "m-536b08e152104b0dadcdb5f0eb653abd"
+    MODEL_ID = "m-84de973f844f4ce5b067e7d54895a1ba"
 
     def __init__(self):
         project_root = Path(__file__).resolve().parents[2]
 
         mlflow_db = project_root / "mlflow.db"
-
         tracking_uri = f"sqlite:///{mlflow_db.as_posix()}"
 
         mlflow.set_tracking_uri(tracking_uri)
 
+        # Use the exact model path that was already confirmed
+        # to load successfully under Python 3.13.
         self.model_uri = (
-            f"file://{project_root.as_posix()}/mlruns/1/models/"
+            "C:/Users/mohda/real-time-fraud-detection/"
+            "mlruns/1/models/"
             f"{self.MODEL_ID}/artifacts"
         )
 
@@ -46,140 +39,169 @@ class FraudModelService:
         self._load_feature_schema()
 
     def _load_feature_schema(self):
-        """
-        Extract the feature structure expected by the MLflow model.
+        python_model = self.model.unwrap_python_model()
 
-        Training used:
-            432 original features
-            + 432 missingness indicators
-            = 864 preprocessing features
-        """
+        self.python_model = python_model
 
-        python_model = self.model._model_impl.python_model
+        if not hasattr(python_model, "original_features"):
+            raise RuntimeError(
+                "MLflow Python model does not contain original_features."
+            )
 
-        self.preprocessor = python_model.preprocessor
+        if not hasattr(python_model, "missing_features"):
+            raise RuntimeError(
+                "MLflow Python model does not contain missing_features."
+            )
+
+        if not hasattr(python_model, "expected_features"):
+            raise RuntimeError(
+                "MLflow Python model does not contain expected_features."
+            )
+
+        self.original_features = list(
+            python_model.original_features
+        )
+
+        self.missing_features = list(
+            python_model.missing_features
+        )
 
         self.expected_features = list(
-            self.preprocessor.feature_names_in_
+            python_model.expected_features
         )
 
-        self.original_features = [
-            column
-            for column in self.expected_features
-            if not column.endswith("_missing")
+        print(
+            "Original features:",
+            len(self.original_features)
+        )
+
+        print(
+            "Missing indicators:",
+            len(self.missing_features)
+        )
+
+        print(
+            "Total model features:",
+            len(self.expected_features)
+        )
+
+        if len(self.original_features) != 432:
+            raise RuntimeError(
+                f"Expected 432 original features, "
+                f"found {len(self.original_features)}."
+            )
+
+        if len(self.missing_features) != 432:
+            raise RuntimeError(
+                f"Expected 432 missing indicators, "
+                f"found {len(self.missing_features)}."
+            )
+
+        if len(self.expected_features) != 864:
+            raise RuntimeError(
+                f"Expected 864 total model features, "
+                f"found {len(self.expected_features)}."
+            )
+
+    def _prepare_input(self, transaction: dict) -> pd.DataFrame:
+        input_data = {
+            key: value
+            for key, value in transaction.items()
+            if key not in {
+                "isFraud",
+                "TransactionID",
+            }
+        }
+
+        original_data = {
+            feature: input_data.get(feature, np.nan)
+            for feature in self.original_features
+        }
+
+        original_df = pd.DataFrame(
+            [original_data],
+            columns=self.original_features,
+        )
+
+        missing_data = {}
+
+        for feature in self.original_features:
+            indicator_name = f"{feature}_missing"
+
+            missing_data[indicator_name] = int(
+                original_df[feature]
+                .isna()
+                .iloc[0]
+            )
+
+        missing_df = pd.DataFrame(
+            [missing_data],
+            columns=self.missing_features,
+        )
+
+        model_input = pd.concat(
+            [
+                original_df,
+                missing_df,
+            ],
+            axis=1,
+        )
+
+        model_input = model_input[
+            self.expected_features
         ]
 
-        self.missing_indicator_features = [
-            column
-            for column in self.expected_features
-            if column.endswith("_missing")
-        ]
+        return model_input
 
-        print(
-            "Expected original features:",
-            len(self.original_features),
+    def predict(self, transaction: dict) -> dict:
+        start_time = time.perf_counter()
+
+        model_input = self._prepare_input(
+            transaction
         )
 
-        print(
-            "Expected missing indicators:",
-            len(self.missing_indicator_features),
+        probabilities = self.model.predict(
+            model_input
         )
 
-        print(
-            "Expected total preprocessing features:",
-            len(self.expected_features),
+        fraud_probability = float(
+            np.asarray(probabilities)
+            .reshape(-1)[0]
         )
 
-    def _prepare_transaction(
-        self,
-        transaction: dict,
-    ) -> pd.DataFrame:
-        """
-        Convert an incoming transaction dictionary into the exact
-        feature structure expected by the trained model.
-        """
+        fraud_prediction = (
+            fraud_probability >= self.THRESHOLD
+        )
 
-        df = pd.DataFrame([transaction])
+        decision = (
+            "FRAUD REVIEW"
+            if fraud_prediction
+            else "LEGITIMATE"
+        )
 
-        if "isFraud" in df.columns:
-            df = df.drop(columns=["isFraud"])
-
-        if "TransactionID" in df.columns:
-            df = df.drop(columns=["TransactionID"])
-
-        for column in self.original_features:
-            if column not in df.columns:
-                df[column] = np.nan
-
-        df = df[self.original_features].copy()
-
-        for column in self.original_features:
-            df[f"{column}_missing"] = df[column].isna().astype(np.int8)
-
-        df = df[self.expected_features].copy()
-
-        return df
-
-    def predict(
-        self,
-        transaction: dict,
-    ) -> dict:
-        """
-        Run fraud inference for a single transaction.
-        """
-
-        features = self._prepare_transaction(transaction)
-
-        prediction_output = self.model.predict(features)
-
-        if isinstance(prediction_output, pd.DataFrame):
-            output = prediction_output.iloc[0].to_dict()
-
-            probability = float(
-                output.get("fraud_probability", 0.0)
-            )
-
-            prediction = bool(
-                output.get(
-                    "fraud_prediction",
-                    probability >= self.THRESHOLD,
-                )
-            )
-
-            decision = output.get(
-                "decision",
-                "FRAUD REVIEW"
-                if prediction
-                else "LEGITIMATE",
-            )
-
-        else:
-            probability = float(np.asarray(prediction_output).reshape(-1)[0])
-
-            prediction = probability >= self.THRESHOLD
-
-            decision = (
-                "FRAUD REVIEW"
-                if prediction
-                else "LEGITIMATE"
-            )
+        prediction_latency_ms = (
+            time.perf_counter() - start_time
+        ) * 1000
 
         return {
-            "fraud_probability": probability,
-            "fraud_prediction": prediction,
+            "fraud_probability": fraud_probability,
+            "fraud_prediction": bool(
+                fraud_prediction
+            ),
             "decision": decision,
             "threshold": self.THRESHOLD,
+            "prediction_latency_ms": (
+                prediction_latency_ms
+            ),
         }
 
 
-if __name__ == "__main__":
-    service = FraudModelService()
-
-    print()
+def main():
     print("=" * 60)
     print("FRAUD MODEL SERVICE TEST")
     print("=" * 60)
-    print()
+
+    service = FraudModelService()
 
     sample_transaction = {
         "TransactionID": 3400379,
@@ -187,17 +209,74 @@ if __name__ == "__main__":
         "TransactionAmt": 1265.50,
         "ProductCD": "W",
         "card1": 9500,
-        "card2": 111.0,
-        "card3": 150.0,
+        "card2": 321,
+        "card3": 150,
         "card4": "visa",
-        "card5": 226.0,
+        "card5": 226,
         "card6": "credit",
+        "addr1": 123,
+        "addr2": 87,
+        "dist1": 10.0,
+        "dist2": 20.0,
+        "P_emaildomain": "gmail.com",
+        "R_emaildomain": "gmail.com",
     }
 
-    result = service.predict(sample_transaction)
-
-    print("Prediction result:")
-    print(result)
-
     print()
-    print("MODEL SERVICE TEST PASSED.")
+    print("Running prediction...")
+
+    try:
+        result = service.predict(
+            sample_transaction
+        )
+
+        print()
+        print("=" * 60)
+        print("PREDICTION RESULT")
+        print("=" * 60)
+
+        print(
+            f"Fraud probability: "
+            f"{result['fraud_probability']:.6f}"
+        )
+
+        print(
+            f"Fraud prediction: "
+            f"{result['fraud_prediction']}"
+        )
+
+        print(
+            f"Decision: "
+            f"{result['decision']}"
+        )
+
+        print(
+            f"Threshold: "
+            f"{result['threshold']:.2f}"
+        )
+
+        print(
+            f"Prediction latency: "
+            f"{result['prediction_latency_ms']:.2f} ms"
+        )
+
+        print()
+        print("=" * 60)
+        print("MODEL SERVICE TEST COMPLETED SUCCESSFULLY")
+        print("=" * 60)
+
+    except Exception as exc:
+        print()
+        print("=" * 60)
+        print("MODEL SERVICE TEST FAILED")
+        print("=" * 60)
+
+        print(
+            f"{type(exc).__name__}: {exc}"
+        )
+
+        raise
+
+
+if __name__ == "__main__":
+    main()
