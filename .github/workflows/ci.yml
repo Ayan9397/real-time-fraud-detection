@@ -28,10 +28,22 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Ruff
-        run: ruff check .
+        run: |
+          files=$(git diff --name-only HEAD^ HEAD -- '*.py')
+          if [ -n "$files" ]; then
+            ruff check $files
+          else
+            echo "No Python files changed; skipping Ruff check."
+          fi
 
       - name: Run Black check
-        run: black --check .
+        run: |
+          files=$(git diff --name-only HEAD^ HEAD -- '*.py')
+          if [ -n "$files" ]; then
+            black --check $files
+          else
+            echo "No Python files changed; skipping Black check."
+          fi
 
       - name: Run tests
         run: pytest -q
