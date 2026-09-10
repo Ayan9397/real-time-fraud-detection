@@ -13,6 +13,28 @@ jobs:
     name: Lint, Test & Build
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fraud_detection
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d fraud_detection"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: fraud_detection
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
