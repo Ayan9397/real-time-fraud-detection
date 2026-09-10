@@ -8,9 +8,9 @@ import pandas as pd
 
 class FraudModelService:
     MODEL_NAME = "fraud_detection_xgboost"
-    MODEL_VERSION = "4"
+    MODEL_VERSION = "6"
     THRESHOLD = 0.60
-    MODEL_ID = "m-84de973f844f4ce5b067e7d54895a1ba"
+    MODEL_ID = "m-967f3bf36a4e41de8a7e62e51ba75b3d"
 
     def __init__(self):
         project_root = Path(__file__).resolve().parents[2]
@@ -124,7 +124,9 @@ class FraudModelService:
         elif isinstance(prediction, pd.Series):
             probability = float(prediction.iloc[0])
         else:
-            probability = float(np.asarray(prediction).reshape(-1)[0])
+            probability = float(
+                np.asarray(prediction).reshape(-1)[0]
+            )
 
         fraud_prediction = probability >= self.THRESHOLD
 
@@ -133,7 +135,9 @@ class FraudModelService:
         else:
             decision = "LEGITIMATE"
 
-        latency_ms = (time.perf_counter() - start_time) * 1000
+        latency_ms = (
+            time.perf_counter() - start_time
+        ) * 1000
 
         return {
             "fraud_probability": probability,

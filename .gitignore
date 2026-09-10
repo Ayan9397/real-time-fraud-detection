@@ -16,12 +16,11 @@ data/processed/
 *.csv
 *.parquet
 *.feather
-models/
+models/*
 *.joblib
 *.pkl
 *.pickle
 mlflow.db
-mlruns/
 mlartifacts/
 *.log
 logs/

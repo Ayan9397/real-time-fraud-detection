@@ -19,16 +19,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-MODEL_PATH = (
-    PROJECT_ROOT
-    / "models"
-    / "xgboost_missing_model.joblib"
-)
+MODEL_PATH = PROJECT_ROOT / "models" / "xgboost_missing_model.joblib"
 
 PREPROCESSOR_PATH = (
-    PROJECT_ROOT
-    / "models"
-    / "xgboost_missing_preprocessor.joblib"
+    PROJECT_ROOT / "models" / "xgboost_missing_preprocessor.joblib"
 )
 
 MLFLOW_DB = PROJECT_ROOT / "mlflow.db"
@@ -37,7 +31,7 @@ EXPERIMENT_NAME = "fraud-detection-modeling"
 
 MODEL_NAME = "fraud_detection_xgboost"
 
-MODEL_VERSION = "3"
+MODEL_VERSION = "5"
 
 THRESHOLD = 0.60
 
@@ -45,6 +39,7 @@ THRESHOLD = 0.60
 # ============================================================
 # CUSTOM MLFLOW PYTHON MODEL
 # ============================================================
+
 
 class FraudDetectionModel(mlflow.pyfunc.PythonModel):
     """
@@ -61,20 +56,11 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
 
     def load_context(self, context):
 
-        self.model = joblib.load(
-            context.artifacts["model"]
-        )
+        self.model = joblib.load(context.artifacts["model"])
 
         self.preprocessor = joblib.load(
             context.artifacts["preprocessor"]
         )
-
-        # ----------------------------------------------------
-        # The preprocessor already expects 864 features:
-        #
-        # 432 original
-        # + 432 missing indicators
-        # ----------------------------------------------------
 
         self.expected_features = list(
             self.preprocessor.feature_names_in_
@@ -92,7 +78,6 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
             if not feature.endswith("_missing")
         ]
 
-        # Safety checks.
         if len(self.original_features) != 432:
             raise RuntimeError(
                 "Unexpected original feature count: "
@@ -122,9 +107,7 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
 
         if isinstance(model_input, dict):
 
-            dataframe = pd.DataFrame(
-                [model_input]
-            )
+            dataframe = pd.DataFrame([model_input])
 
         elif isinstance(model_input, pd.Series):
 
@@ -141,10 +124,6 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
                 "pandas Series, or pandas DataFrame."
             )
 
-        # ----------------------------------------------------
-        # Remove target and identifier.
-        # ----------------------------------------------------
-
         dataframe = dataframe.drop(
             columns=[
                 "isFraud",
@@ -152,12 +131,6 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
             ],
             errors="ignore",
         )
-
-        # ----------------------------------------------------
-        # Build original 432 features.
-        #
-        # Missing features use np.nan.
-        # ----------------------------------------------------
 
         prepared_data = {
             feature: (
@@ -173,24 +146,14 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
             columns=self.original_features,
         )
 
-        # ----------------------------------------------------
-        # Create exactly 432 missingness indicators.
-        # ----------------------------------------------------
-
         missing_indicators = (
-            original_dataframe
-            .isna()
-            .astype(np.int8)
+            original_dataframe.isna().astype(np.int8)
         )
 
         missing_indicators.columns = [
             f"{feature}_missing"
             for feature in self.original_features
         ]
-
-        # ----------------------------------------------------
-        # Combine 432 original + 432 indicators.
-        # ----------------------------------------------------
 
         prepared_dataframe = pd.concat(
             [
@@ -199,10 +162,6 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
             ],
             axis=1,
         )
-
-        # ----------------------------------------------------
-        # Match the exact training feature order.
-        # ----------------------------------------------------
 
         prepared_dataframe = prepared_dataframe[
             self.expected_features
@@ -222,9 +181,7 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
 
         start_time = time.perf_counter()
 
-        dataframe = self._prepare_input(
-            model_input
-        )
+        dataframe = self._prepare_input(model_input)
 
         transformed = self.preprocessor.transform(
             dataframe
@@ -267,10 +224,11 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
 # CREATE MLFLOW MODEL
 # ============================================================
 
+
 def main():
 
     print("=" * 70)
-    print("CREATE MLFLOW FRAUD DETECTION MODEL")
+    print("CREATE PORTABLE MLFLOW FRAUD DETECTION MODEL")
     print("=" * 70)
     print()
 
@@ -283,21 +241,12 @@ def main():
     if not PREPROCESSOR_PATH.exists():
 
         raise FileNotFoundError(
-            f"Preprocessor not found: "
-            f"{PREPROCESSOR_PATH}"
+            f"Preprocessor not found: {PREPROCESSOR_PATH}"
         )
 
-    # --------------------------------------------------------
-    # Configure MLflow.
-    # --------------------------------------------------------
+    tracking_uri = f"sqlite:///{MLFLOW_DB}"
 
-    tracking_uri = (
-        f"sqlite:///{MLFLOW_DB}"
-    )
-
-    mlflow.set_tracking_uri(
-        tracking_uri
-    )
+    mlflow.set_tracking_uri(tracking_uri)
 
     print(
         f"MLflow tracking URI: "
@@ -305,10 +254,6 @@ def main():
     )
 
     print()
-
-    # --------------------------------------------------------
-    # Experiment.
-    # --------------------------------------------------------
 
     experiment = (
         mlflow.get_experiment_by_name(
@@ -318,21 +263,15 @@ def main():
 
     if experiment is None:
 
-        experiment_id = (
-            mlflow.create_experiment(
-                EXPERIMENT_NAME
-            )
+        experiment_id = mlflow.create_experiment(
+            EXPERIMENT_NAME
         )
 
     else:
 
-        experiment_id = (
-            experiment.experiment_id
-        )
+        experiment_id = experiment.experiment_id
 
-    mlflow.set_experiment(
-        EXPERIMENT_NAME
-    )
+    mlflow.set_experiment(EXPERIMENT_NAME)
 
     print(
         f"Using experiment: "
@@ -346,12 +285,8 @@ def main():
 
     print()
 
-    # --------------------------------------------------------
-    # Start run.
-    # --------------------------------------------------------
-
     with mlflow.start_run(
-        run_name="champion_xgboost_pyfunc_v3"
+        run_name="champion_xgboost_pyfunc_v5"
     ) as run:
 
         run_id = run.info.run_id
@@ -361,25 +296,20 @@ def main():
         )
 
         print()
-        print("Logging MLflow model...")
+        print("Logging portable MLflow model...")
 
         artifacts = {
-            "model": str(MODEL_PATH),
+            "model": str(MODEL_PATH.resolve()),
             "preprocessor": str(
-                PREPROCESSOR_PATH
+                PREPROCESSOR_PATH.resolve()
             ),
         }
 
-        mlflow.pyfunc.log_model(
-            artifact_path="fraud_detection_model",
+        model_info = mlflow.pyfunc.log_model(
+            name="fraud_detection_model",
             python_model=FraudDetectionModel(),
             artifacts=artifacts,
-            registered_model_name=MODEL_NAME,
         )
-
-        # ----------------------------------------------------
-        # Metadata.
-        # ----------------------------------------------------
 
         mlflow.log_param(
             "model_type",
@@ -426,10 +356,6 @@ def main():
             "XGBoost + missingness-aware preprocessing",
         )
 
-        # ----------------------------------------------------
-        # Locked test metrics.
-        # ----------------------------------------------------
-
         mlflow.log_metrics(
             {
                 "test_roc_auc": 0.8989,
@@ -443,23 +369,29 @@ def main():
 
         print()
         print("=" * 70)
-        print("MLFLOW MODEL CREATED SUCCESSFULLY")
+        print("PORTABLE MLFLOW MODEL CREATED SUCCESSFULLY")
         print("=" * 70)
         print()
         print(
             f"Run ID: {run_id}"
         )
         print(
+            f"Model URI: {model_info.model_uri}"
+        )
+        print(
+            f"Model ID: {model_info.model_id}"
+        )
+        print(
             f"Model: {MODEL_NAME}"
         )
         print(
-            f"Original features: 432"
+            "Original features: 432"
         )
         print(
-            f"Missing indicators: 432"
+            "Missing indicators: 432"
         )
         print(
-            f"Total features: 864"
+            "Total features: 864"
         )
         print(
             f"Threshold: {THRESHOLD}"

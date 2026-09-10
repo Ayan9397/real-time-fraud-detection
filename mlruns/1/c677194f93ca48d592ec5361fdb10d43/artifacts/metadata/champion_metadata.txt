@@ -1,0 +1,21 @@
+Fraud Detection Champion Model
+================================
+
+Model: XGBoost
+Feature strategy: Original + missing indicators
+Original features: 432
+Missing indicators: 432
+Total features before encoding: 864
+Validation PR-AUC: 0.5827
+Validation ROC-AUC: 0.9197
+Validation F1: 0.5414
+Selected threshold: 0.60
+Test PR-AUC: 0.5203
+Test ROC-AUC: 0.8989
+Test F1 at threshold 0.60: 0.5009
+
+Model object type:
+<class 'xgboost.sklearn.XGBClassifier'>
+
+MLflow run ID:
+c677194f93ca48d592ec5361fdb10d43

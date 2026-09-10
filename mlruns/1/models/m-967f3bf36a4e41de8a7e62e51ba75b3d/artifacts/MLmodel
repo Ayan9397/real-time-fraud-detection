@@ -1,0 +1,26 @@
+artifact_path: file:./mlruns/1/models/m-967f3bf36a4e41de8a7e62e51ba75b3d/artifacts
+flavors:
+  python_function:
+    artifacts:
+      model:
+        path: artifacts/xgboost_missing_model.joblib
+        uri: /mnt/c/Users/mohda/real-time-fraud-detection/models/xgboost_missing_model.joblib
+      preprocessor:
+        path: artifacts/xgboost_missing_preprocessor.joblib
+        uri: /mnt/c/Users/mohda/real-time-fraud-detection/models/xgboost_missing_preprocessor.joblib
+    cloudpickle_version: 3.1.2
+    code: null
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.pyfunc.model
+    python_model: python_model.pkl
+    python_version: 3.13.15
+    streamable: false
+mlflow_version: 3.16.0
+model_id: m-967f3bf36a4e41de8a7e62e51ba75b3d
+model_size_bytes: 3891728
+model_uuid: m-967f3bf36a4e41de8a7e62e51ba75b3d
+prompts: null
+run_id: 9af08d76894a434c90da39ce0f30589f
+utc_time_created: '2026-09-10 09:49:56.880113'
