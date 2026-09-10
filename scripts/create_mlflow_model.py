@@ -20,9 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 MODEL_PATH = PROJECT_ROOT / "models" / "xgboost_missing_model.joblib"
 
-PREPROCESSOR_PATH = (
-    PROJECT_ROOT / "models" / "xgboost_missing_preprocessor.joblib"
-)
+PREPROCESSOR_PATH = PROJECT_ROOT / "models" / "xgboost_missing_preprocessor.joblib"
 
 MLFLOW_DB = PROJECT_ROOT / "mlflow.db"
 
@@ -57,13 +55,9 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
 
         self.model = joblib.load(context.artifacts["model"])
 
-        self.preprocessor = joblib.load(
-            context.artifacts["preprocessor"]
-        )
+        self.preprocessor = joblib.load(context.artifacts["preprocessor"])
 
-        self.expected_features = list(
-            self.preprocessor.feature_names_in_
-        )
+        self.expected_features = list(self.preprocessor.feature_names_in_)
 
         self.missing_features = [
             feature
@@ -133,9 +127,7 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
 
         prepared_data = {
             feature: (
-                dataframe[feature].iloc[0]
-                if feature in dataframe.columns
-                else np.nan
+                dataframe[feature].iloc[0] if feature in dataframe.columns else np.nan
             )
             for feature in self.original_features
         }
@@ -145,13 +137,10 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
             columns=self.original_features,
         )
 
-        missing_indicators = (
-            original_dataframe.isna().astype(np.int8)
-        )
+        missing_indicators = original_dataframe.isna().astype(np.int8)
 
         missing_indicators.columns = [
-            f"{feature}_missing"
-            for feature in self.original_features
+            f"{feature}_missing" for feature in self.original_features
         ]
 
         prepared_dataframe = pd.concat(
@@ -162,9 +151,7 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
             axis=1,
         )
 
-        prepared_dataframe = prepared_dataframe[
-            self.expected_features
-        ]
+        prepared_dataframe = prepared_dataframe[self.expected_features]
 
         return prepared_dataframe
 
@@ -182,19 +169,11 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
 
         dataframe = self._prepare_input(model_input)
 
-        transformed = self.preprocessor.transform(
-            dataframe
-        )
+        transformed = self.preprocessor.transform(dataframe)
 
-        probabilities = (
-            self.model.predict_proba(
-                transformed
-            )[:, 1]
-        )
+        probabilities = self.model.predict_proba(transformed)[:, 1]
 
-        predictions = (
-            probabilities >= THRESHOLD
-        )
+        predictions = probabilities >= THRESHOLD
 
         decisions = np.where(
             predictions,
@@ -202,9 +181,7 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
             "LEGITIMATE",
         )
 
-        inference_latency_ms = (
-            time.perf_counter() - start_time
-        ) * 1000
+        inference_latency_ms = (time.perf_counter() - start_time) * 1000
 
         return pd.DataFrame(
             {
@@ -212,9 +189,7 @@ class FraudDetectionModel(mlflow.pyfunc.PythonModel):
                 "fraud_prediction": predictions,
                 "decision": decisions,
                 "threshold": THRESHOLD,
-                "prediction_latency_ms": (
-                    inference_latency_ms
-                ),
+                "prediction_latency_ms": (inference_latency_ms),
             }
         )
 
@@ -233,38 +208,25 @@ def main():
 
     if not MODEL_PATH.exists():
 
-        raise FileNotFoundError(
-            f"Model not found: {MODEL_PATH}"
-        )
+        raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
 
     if not PREPROCESSOR_PATH.exists():
 
-        raise FileNotFoundError(
-            f"Preprocessor not found: {PREPROCESSOR_PATH}"
-        )
+        raise FileNotFoundError(f"Preprocessor not found: {PREPROCESSOR_PATH}")
 
     tracking_uri = f"sqlite:///{MLFLOW_DB}"
 
     mlflow.set_tracking_uri(tracking_uri)
 
-    print(
-        f"MLflow tracking URI: "
-        f"{tracking_uri}"
-    )
+    print(f"MLflow tracking URI: " f"{tracking_uri}")
 
     print()
 
-    experiment = (
-        mlflow.get_experiment_by_name(
-            EXPERIMENT_NAME
-        )
-    )
+    experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
 
     if experiment is None:
 
-        experiment_id = mlflow.create_experiment(
-            EXPERIMENT_NAME
-        )
+        experiment_id = mlflow.create_experiment(EXPERIMENT_NAME)
 
     else:
 
@@ -272,36 +234,24 @@ def main():
 
     mlflow.set_experiment(EXPERIMENT_NAME)
 
-    print(
-        f"Using experiment: "
-        f"{EXPERIMENT_NAME}"
-    )
+    print(f"Using experiment: " f"{EXPERIMENT_NAME}")
 
-    print(
-        f"Experiment ID: "
-        f"{experiment_id}"
-    )
+    print(f"Experiment ID: " f"{experiment_id}")
 
     print()
 
-    with mlflow.start_run(
-        run_name="champion_xgboost_pyfunc_v5"
-    ) as run:
+    with mlflow.start_run(run_name="champion_xgboost_pyfunc_v5") as run:
 
         run_id = run.info.run_id
 
-        print(
-            f"MLflow Run ID: {run_id}"
-        )
+        print(f"MLflow Run ID: {run_id}")
 
         print()
         print("Logging portable MLflow model...")
 
         artifacts = {
             "model": str(MODEL_PATH.resolve()),
-            "preprocessor": str(
-                PREPROCESSOR_PATH.resolve()
-            ),
+            "preprocessor": str(PREPROCESSOR_PATH.resolve()),
         }
 
         model_info = mlflow.pyfunc.log_model(
@@ -371,34 +321,16 @@ def main():
         print("PORTABLE MLFLOW MODEL CREATED SUCCESSFULLY")
         print("=" * 70)
         print()
-        print(
-            f"Run ID: {run_id}"
-        )
-        print(
-            f"Model URI: {model_info.model_uri}"
-        )
-        print(
-            f"Model ID: {model_info.model_id}"
-        )
-        print(
-            f"Model: {MODEL_NAME}"
-        )
-        print(
-            "Original features: 432"
-        )
-        print(
-            "Missing indicators: 432"
-        )
-        print(
-            "Total features: 864"
-        )
-        print(
-            f"Threshold: {THRESHOLD}"
-        )
+        print(f"Run ID: {run_id}")
+        print(f"Model URI: {model_info.model_uri}")
+        print(f"Model ID: {model_info.model_id}")
+        print(f"Model: {MODEL_NAME}")
+        print("Original features: 432")
+        print("Missing indicators: 432")
+        print("Total features: 864")
+        print(f"Threshold: {THRESHOLD}")
         print()
-        print(
-            "MLflow model logging completed."
-        )
+        print("MLflow model logging completed.")
 
 
 if __name__ == "__main__":

@@ -21,12 +21,7 @@ class FraudModelService:
         mlflow.set_tracking_uri(tracking_uri)
 
         self.model_uri = (
-            project_root
-            / "mlruns"
-            / "1"
-            / "models"
-            / self.MODEL_ID
-            / "artifacts"
+            project_root / "mlruns" / "1" / "models" / self.MODEL_ID / "artifacts"
         ).as_posix()
 
         print("Loading MLflow model...")
@@ -50,9 +45,7 @@ class FraudModelService:
             )
 
         if not hasattr(python_model, "missing_features"):
-            raise RuntimeError(
-                "MLflow Python model does not contain missing_features."
-            )
+            raise RuntimeError("MLflow Python model does not contain missing_features.")
 
         if not hasattr(python_model, "expected_features"):
             raise RuntimeError(
@@ -98,10 +91,7 @@ class FraudModelService:
         original = original[self.original_features]
 
         missing = original.isna().astype(np.int8)
-        missing.columns = [
-            f"{column}_missing"
-            for column in self.original_features
-        ]
+        missing.columns = [f"{column}_missing" for column in self.original_features]
 
         features = pd.concat(
             [original, missing],
@@ -124,9 +114,7 @@ class FraudModelService:
         elif isinstance(prediction, pd.Series):
             probability = float(prediction.iloc[0])
         else:
-            probability = float(
-                np.asarray(prediction).reshape(-1)[0]
-            )
+            probability = float(np.asarray(prediction).reshape(-1)[0])
 
         fraud_prediction = probability >= self.THRESHOLD
 
@@ -135,9 +123,7 @@ class FraudModelService:
         else:
             decision = "LEGITIMATE"
 
-        latency_ms = (
-            time.perf_counter() - start_time
-        ) * 1000
+        latency_ms = (time.perf_counter() - start_time) * 1000
 
         return {
             "fraud_probability": probability,
