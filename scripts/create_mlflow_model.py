@@ -1,13 +1,12 @@
-from pathlib import Path
 import sys
 import time
+from pathlib import Path
 
 import joblib
 import mlflow
 import mlflow.pyfunc
 import numpy as np
 import pandas as pd
-
 
 # ============================================================
 # PROJECT CONFIGURATION
