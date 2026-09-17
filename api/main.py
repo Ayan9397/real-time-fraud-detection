@@ -1,9 +1,19 @@
 import time
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from api.metrics import (
+    CACHE_REQUESTS_TOTAL,
+    FRAUD_INFERENCE_DURATION_SECONDS,
+    FRAUD_PREDICTIONS_TOTAL,
+    FRAUD_RISK_SCORE,
+    HTTP_REQUEST_DURATION_SECONDS,
+    HTTP_REQUESTS_TOTAL,
+)
 from api.schemas.fraud import FraudTransactionRequest
 from api.services.database_service import DatabaseService
 from api.services.fraud_model import FraudModelService
@@ -24,6 +34,37 @@ app = FastAPI(
     ),
     version="2.0.0",
 )
+
+
+@app.middleware("http")
+async def monitor_requests(request: Request, call_next):
+    """Middleware to track request throughput and latency via Prometheus."""
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    duration = time.perf_counter() - start_time
+    endpoint = request.url.path
+
+    if endpoint != "/metrics":
+        HTTP_REQUESTS_TOTAL.labels(
+            method=request.method,
+            endpoint=endpoint,
+            status_code=response.status_code,
+        ).inc()
+        HTTP_REQUEST_DURATION_SECONDS.labels(
+            method=request.method,
+            endpoint=endpoint,
+        ).observe(duration)
+
+    return response
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    """Expose Prometheus metrics for monitoring and alerting."""
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 
 # ============================================================
@@ -154,6 +195,15 @@ def predict_fraud(
         cached_prediction = fraud_cache.get_prediction(transaction_id)
 
         if cached_prediction is not None:
+            CACHE_REQUESTS_TOTAL.labels(result="hit").inc()
+            FRAUD_PREDICTIONS_TOTAL.labels(
+                decision=str(cached_prediction.get("decision", "unknown")),
+                model_version=str(cached_prediction.get("model_version", "unknown")),
+            ).inc()
+            FRAUD_RISK_SCORE.observe(
+                float(cached_prediction.get("fraud_probability", 0.0))
+            )
+
             total_latency_ms = (time.perf_counter() - request_start_time) * 1000
 
             return {
@@ -167,6 +217,8 @@ def predict_fraud(
                 "cache_hit": True,
                 "database_hit": False,
             }
+
+        CACHE_REQUESTS_TOTAL.labels(result="miss").inc()
 
         # ====================================================
         # 2. PostgreSQL lookup
@@ -204,6 +256,12 @@ def predict_fraud(
                     prediction=database_result,
                 )
 
+                FRAUD_PREDICTIONS_TOTAL.labels(
+                    decision=str(existing_prediction.decision),
+                    model_version=str(existing_prediction.model_version),
+                ).inc()
+                FRAUD_RISK_SCORE.observe(float(existing_prediction.fraud_probability))
+
                 total_latency_ms = (time.perf_counter() - request_start_time) * 1000
 
                 return {
@@ -229,6 +287,12 @@ def predict_fraud(
         result = model_service.predict(transaction_data)
 
         prediction_latency_ms = (time.perf_counter() - inference_start_time) * 1000
+        FRAUD_INFERENCE_DURATION_SECONDS.observe(prediction_latency_ms / 1000.0)
+        FRAUD_PREDICTIONS_TOTAL.labels(
+            decision=str(result["decision"]),
+            model_version=str(model_service.MODEL_VERSION),
+        ).inc()
+        FRAUD_RISK_SCORE.observe(float(result["fraud_probability"]))
 
         # ====================================================
         # 4. Prepare PostgreSQL transaction record

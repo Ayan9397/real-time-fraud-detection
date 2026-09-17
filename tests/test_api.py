@@ -43,3 +43,14 @@ def test_predict_missing_transaction_id():
 
     assert response.status_code == 400
     assert response.json()["detail"] == "TransactionID is required."
+
+
+def test_metrics_endpoint():
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "text/plain" in response.headers.get("content-type", "")
+    content = response.text
+    assert "http_requests_total" in content
+    assert "fraud_predictions_total" in content
+    assert "fraud_risk_score" in content
