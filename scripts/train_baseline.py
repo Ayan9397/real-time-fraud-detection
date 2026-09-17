@@ -2,7 +2,6 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
@@ -17,7 +16,6 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
-
 
 DATA_DIR = Path("data/processed")
 MODEL_DIR = Path("models")
@@ -54,13 +52,9 @@ def load_data(filename):
 
 def build_pipeline(X):
 
-    numeric_features = X.select_dtypes(
-        include=["number"]
-    ).columns.tolist()
+    numeric_features = X.select_dtypes(include=["number"]).columns.tolist()
 
-    categorical_features = X.select_dtypes(
-        exclude=["number"]
-    ).columns.tolist()
+    categorical_features = X.select_dtypes(exclude=["number"]).columns.tolist()
 
     numeric_pipeline = Pipeline(
         steps=[
@@ -123,9 +117,7 @@ def evaluate(model, X, y, name):
 
     probabilities = model.predict_proba(X)[:, 1]
 
-    predictions = (
-        probabilities >= 0.5
-    ).astype(int)
+    predictions = (probabilities >= 0.5).astype(int)
 
     precision = precision_score(
         y,
@@ -240,9 +232,7 @@ def main():
         exist_ok=True,
     )
 
-    model_path = (
-        MODEL_DIR / "logistic_baseline.joblib"
-    )
+    model_path = MODEL_DIR / "logistic_baseline.joblib"
 
     joblib.dump(
         pipeline,

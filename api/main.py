@@ -11,7 +11,6 @@ from src.cache.fraud_cache import FraudCache
 from src.cache.redis_client import RedisClient
 from src.database.connection import get_db
 
-
 # ============================================================
 # FastAPI Application
 # ============================================================
@@ -45,9 +44,10 @@ fraud_cache = FraudCache(
 # Health Check
 # ============================================================
 
+
 @app.get("/health")
 def health_check(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db),  # noqa: B008
 ):
     """
     Check the health of:
@@ -65,7 +65,7 @@ def health_check(
 
     try:
         db.execute(text("SELECT 1"))
-    except Exception:
+    except Exception:  # noqa: BLE001
         database_status = "unhealthy"
 
     # --------------------------------------------------------
@@ -75,7 +75,7 @@ def health_check(
     try:
         if not redis_client.ping():
             redis_status = "unhealthy"
-    except Exception:
+    except Exception:  # noqa: BLE001
         redis_status = "unhealthy"
 
     # --------------------------------------------------------
@@ -84,8 +84,7 @@ def health_check(
 
     overall_status = (
         "healthy"
-        if database_status == "healthy"
-        and redis_status == "healthy"
+        if database_status == "healthy" and redis_status == "healthy"
         else "degraded"
     )
 
@@ -93,9 +92,7 @@ def health_check(
         "status": overall_status,
         "model": model_service.MODEL_NAME,
         "model_version": model_service.MODEL_VERSION,
-        "expected_features": len(
-            model_service.expected_features
-        ),
+        "expected_features": len(model_service.expected_features),
         "database": database_status,
         "redis": redis_status,
     }
@@ -105,10 +102,11 @@ def health_check(
 # Fraud Prediction Endpoint
 # ============================================================
 
+
 @app.post("/predict")
 def predict_fraud(
     transaction: FraudTransactionRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db),  # noqa: B008
 ):
     """
     Predict fraud risk for a transaction.
@@ -153,15 +151,10 @@ def predict_fraud(
         # 1. Redis cache lookup
         # ====================================================
 
-        cached_prediction = fraud_cache.get_prediction(
-            transaction_id
-        )
+        cached_prediction = fraud_cache.get_prediction(transaction_id)
 
         if cached_prediction is not None:
-            total_latency_ms = (
-                time.perf_counter()
-                - request_start_time
-            ) * 1000
+            total_latency_ms = (time.perf_counter() - request_start_time) * 1000
 
             return {
                 "success": True,
@@ -179,52 +172,27 @@ def predict_fraud(
         # 2. PostgreSQL lookup
         # ====================================================
 
-        existing_transaction = (
-            database_service.get_transaction(
-                transaction_id
-            )
-        )
+        existing_transaction = database_service.get_transaction(transaction_id)
 
         if existing_transaction is not None:
-            existing_prediction = (
-                database_service.get_latest_prediction(
-                    transaction_id
-                )
-            )
+            existing_prediction = database_service.get_latest_prediction(transaction_id)
 
             if existing_prediction is not None:
                 prediction_latency_ms = (
-                    float(
-                        existing_prediction.prediction_latency_ms
-                    )
-                    if existing_prediction.prediction_latency_ms
-                    is not None
+                    float(existing_prediction.prediction_latency_ms)
+                    if existing_prediction.prediction_latency_ms is not None
                     else 0.0
                 )
 
                 database_result = {
-                    "model": (
-                        existing_prediction.model_name
-                    ),
-                    "model_version": (
-                        existing_prediction.model_version
-                    ),
+                    "model": (existing_prediction.model_name),
+                    "model_version": (existing_prediction.model_version),
                     "transaction_id": transaction_id,
-                    "fraud_probability": float(
-                        existing_prediction.fraud_probability
-                    ),
-                    "fraud_prediction": bool(
-                        existing_prediction.fraud_prediction
-                    ),
-                    "decision": (
-                        existing_prediction.decision
-                    ),
-                    "threshold": float(
-                        existing_prediction.threshold
-                    ),
-                    "prediction_latency_ms": (
-                        prediction_latency_ms
-                    ),
+                    "fraud_probability": float(existing_prediction.fraud_probability),
+                    "fraud_prediction": bool(existing_prediction.fraud_prediction),
+                    "decision": (existing_prediction.decision),
+                    "threshold": float(existing_prediction.threshold),
+                    "prediction_latency_ms": (prediction_latency_ms),
                 }
 
                 # ------------------------------------------------
@@ -236,10 +204,7 @@ def predict_fraud(
                     prediction=database_result,
                 )
 
-                total_latency_ms = (
-                    time.perf_counter()
-                    - request_start_time
-                ) * 1000
+                total_latency_ms = (time.perf_counter() - request_start_time) * 1000
 
                 return {
                     "success": True,
@@ -257,20 +222,13 @@ def predict_fraud(
         # 3. ML model inference
         # ====================================================
 
-        transaction_data = (
-            transaction.to_transaction_dict()
-        )
+        transaction_data = transaction.to_transaction_dict()
 
         inference_start_time = time.perf_counter()
 
-        result = model_service.predict(
-            transaction_data
-        )
+        result = model_service.predict(transaction_data)
 
-        prediction_latency_ms = (
-            time.perf_counter()
-            - inference_start_time
-        ) * 1000
+        prediction_latency_ms = (time.perf_counter() - inference_start_time) * 1000
 
         # ====================================================
         # 4. Prepare PostgreSQL transaction record
@@ -278,65 +236,33 @@ def predict_fraud(
 
         database_transaction_data = {
             "transaction_id": transaction_id,
-            "transaction_dt": int(
-                transaction.TransactionDT
-            ),
-            "transaction_amt": float(
-                transaction.TransactionAmt
-            ),
+            "transaction_dt": int(transaction.TransactionDT),
+            "transaction_amt": float(transaction.TransactionAmt),
             "product_cd": transaction.ProductCD,
-
             "card1": (
-                int(transaction.card1)
-                if transaction.card1 is not None
-                else None
+                int(transaction.card1) if transaction.card1 is not None else None
             ),
-
             "card2": (
-                int(transaction.card2)
-                if transaction.card2 is not None
-                else None
+                int(transaction.card2) if transaction.card2 is not None else None
             ),
-
             "card3": (
-                int(transaction.card3)
-                if transaction.card3 is not None
-                else None
+                int(transaction.card3) if transaction.card3 is not None else None
             ),
-
             "card4": transaction.card4,
-
             "card5": (
-                int(transaction.card5)
-                if transaction.card5 is not None
-                else None
+                int(transaction.card5) if transaction.card5 is not None else None
             ),
-
             "card6": transaction.card6,
-
             "addr1": (
-                int(transaction.addr1)
-                if transaction.addr1 is not None
-                else None
+                int(transaction.addr1) if transaction.addr1 is not None else None
             ),
-
             "addr2": (
-                int(transaction.addr2)
-                if transaction.addr2 is not None
-                else None
+                int(transaction.addr2) if transaction.addr2 is not None else None
             ),
-
             "dist1": transaction.dist1,
             "dist2": transaction.dist2,
-
-            "p_emaildomain": (
-                transaction.P_emaildomain
-            ),
-
-            "r_emaildomain": (
-                transaction.R_emaildomain
-            ),
-
+            "p_emaildomain": (transaction.P_emaildomain),
+            "r_emaildomain": (transaction.R_emaildomain),
             "actual_fraud": None,
         }
 
@@ -344,9 +270,7 @@ def predict_fraud(
         # 5. Persist transaction
         # ====================================================
 
-        database_service.save_transaction(
-            database_transaction_data
-        )
+        database_service.save_transaction(database_transaction_data)
 
         # ====================================================
         # 6. Persist prediction
@@ -358,17 +282,11 @@ def predict_fraud(
             transaction_id=transaction_id,
             model_name=model_service.MODEL_NAME,
             model_version=model_service.MODEL_VERSION,
-            fraud_probability=(
-                result["fraud_probability"]
-            ),
-            fraud_prediction=bool(
-                result["fraud_prediction"]
-            ),
+            fraud_probability=(result["fraud_probability"]),
+            fraud_prediction=bool(result["fraud_prediction"]),
             decision=result["decision"],
             threshold=threshold,
-            prediction_latency_ms=(
-                prediction_latency_ms
-            ),
+            prediction_latency_ms=(prediction_latency_ms),
         )
 
         # ====================================================
@@ -383,16 +301,10 @@ def predict_fraud(
 
         cache_result = {
             "model": model_service.MODEL_NAME,
-            "model_version": (
-                model_service.MODEL_VERSION
-            ),
+            "model_version": (model_service.MODEL_VERSION),
             "transaction_id": transaction_id,
-            "fraud_probability": (
-                result["fraud_probability"]
-            ),
-            "fraud_prediction": (
-                result["fraud_prediction"]
-            ),
+            "fraud_probability": (result["fraud_probability"]),
+            "fraud_prediction": (result["fraud_prediction"]),
             "decision": result["decision"],
             "threshold": threshold,
             "prediction_latency_ms": round(
@@ -414,10 +326,7 @@ def predict_fraud(
         # 10. Calculate complete request latency
         # ====================================================
 
-        total_latency_ms = (
-            time.perf_counter()
-            - request_start_time
-        ) * 1000
+        total_latency_ms = (time.perf_counter() - request_start_time) * 1000
 
         # ====================================================
         # 11. Return API response
@@ -448,10 +357,10 @@ def predict_fraud(
     # Unexpected errors
     # ========================================================
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         db.rollback()
 
         raise HTTPException(
             status_code=500,
-            detail=f"Prediction failed: {str(exc)}",
+            detail=f"Prediction failed: {exc!s}",
         )

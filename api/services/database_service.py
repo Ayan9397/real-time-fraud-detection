@@ -12,11 +12,18 @@ class DatabaseService:
         self.db = db
 
     def get_transaction(self, transaction_id: int) -> Transaction | None:
-        statement = select(Transaction).where(Transaction.transaction_id == int(transaction_id))
+        statement = select(Transaction).where(
+            Transaction.transaction_id == int(transaction_id)
+        )
         return self.db.execute(statement).scalar_one_or_none()
 
     def get_latest_prediction(self, transaction_id: int) -> FraudPrediction | None:
-        statement = (select(FraudPrediction).where(FraudPrediction.transaction_id == int(transaction_id)).order_by(FraudPrediction.created_at.desc()).limit(1))
+        statement = (
+            select(FraudPrediction)
+            .where(FraudPrediction.transaction_id == int(transaction_id))
+            .order_by(FraudPrediction.created_at.desc())
+            .limit(1)
+        )
         return self.db.execute(statement).scalar_one_or_none()
 
     def save_transaction(self, transaction_data: dict[str, Any]) -> Transaction:
@@ -43,7 +50,17 @@ class DatabaseService:
         self.db.flush()
         return transaction
 
-    def save_prediction(self, transaction_id: int, model_name: str, model_version: str, fraud_probability: float, fraud_prediction: bool, decision: str, threshold: float, prediction_latency_ms: float | None = None) -> FraudPrediction:
+    def save_prediction(
+        self,
+        transaction_id: int,
+        model_name: str,
+        model_version: str,
+        fraud_probability: float,
+        fraud_prediction: bool,
+        decision: str,
+        threshold: float,
+        prediction_latency_ms: float | None = None,
+    ) -> FraudPrediction:
         prediction = FraudPrediction(
             transaction_id=transaction_id,
             model_name=model_name,
@@ -52,7 +69,11 @@ class DatabaseService:
             fraud_prediction=fraud_prediction,
             decision=decision,
             threshold=Decimal(str(threshold)),
-            prediction_latency_ms=(Decimal(str(prediction_latency_ms)) if prediction_latency_ms is not None else None),
+            prediction_latency_ms=(
+                Decimal(str(prediction_latency_ms))
+                if prediction_latency_ms is not None
+                else None
+            ),
         )
         self.db.add(prediction)
         self.db.flush()

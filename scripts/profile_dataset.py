@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 RAW_DATA_DIR = Path("data/raw")
 
 TRANSACTION_FILE = RAW_DATA_DIR / "train_transaction.csv"
@@ -17,10 +16,7 @@ def profile_transaction_data() -> None:
     print("=" * 70)
 
     # Read only the header first.
-    columns = pd.read_csv(
-        TRANSACTION_FILE,
-        nrows=0
-    ).columns.tolist()
+    columns = pd.read_csv(TRANSACTION_FILE, nrows=0).columns.tolist()
 
     print(f"\nTotal columns: {len(columns)}")
 
@@ -28,10 +24,7 @@ def profile_transaction_data() -> None:
     categorical_columns = []
 
     # Read a sample to determine initial data types.
-    sample = pd.read_csv(
-        TRANSACTION_FILE,
-        nrows=10_000
-    )
+    sample = pd.read_csv(TRANSACTION_FILE, nrows=10_000)
 
     for column in sample.columns:
         if pd.api.types.is_numeric_dtype(sample[column]):
@@ -46,21 +39,13 @@ def profile_transaction_data() -> None:
     for column in categorical_columns:
         unique_count = sample[column].nunique(dropna=True)
 
-        print(
-            f"  {column:<20} "
-            f"unique values: {unique_count}"
-        )
+        print(f"  {column:<20} " f"unique values: {unique_count}")
 
     print("\nNumeric columns:")
-    print(
-        "  "
-        + ", ".join(numeric_columns[:30])
-    )
+    print("  " + ", ".join(numeric_columns[:30]))
 
     if len(numeric_columns) > 30:
-        print(
-            f"  ... and {len(numeric_columns) - 30} more"
-        )
+        print(f"  ... and {len(numeric_columns) - 30} more")
 
 
 def profile_missing_values() -> None:
@@ -73,18 +58,13 @@ def profile_missing_values() -> None:
     missing_counts = {}
     total_rows = 0
 
-    for chunk in pd.read_csv(
-        TRANSACTION_FILE,
-        chunksize=50_000
-    ):
+    for chunk in pd.read_csv(TRANSACTION_FILE, chunksize=50_000):
         total_rows += len(chunk)
 
         missing = chunk.isna().sum()
 
         for column, count in missing.items():
-            missing_counts[column] = (
-                missing_counts.get(column, 0) + count
-            )
+            missing_counts[column] = missing_counts.get(column, 0) + count
 
     missing_df = pd.DataFrame(
         {
@@ -93,22 +73,13 @@ def profile_missing_values() -> None:
         }
     )
 
-    missing_df["missing_percentage"] = (
-        missing_df["missing_count"]
-        / total_rows
-        * 100
-    )
+    missing_df["missing_percentage"] = missing_df["missing_count"] / total_rows * 100
 
-    missing_df = missing_df.sort_values(
-        "missing_percentage",
-        ascending=False
-    )
+    missing_df = missing_df.sort_values("missing_percentage", ascending=False)
 
     print("\nTop 30 columns by missing percentage:\n")
 
-    print(
-        missing_df.head(30).to_string(index=False)
-    )
+    print(missing_df.head(30).to_string(index=False))
 
     return missing_df
 
@@ -123,26 +94,15 @@ def profile_identity_coverage() -> None:
     transaction_ids = set()
 
     for chunk in pd.read_csv(
-        TRANSACTION_FILE,
-        usecols=["TransactionID"],
-        chunksize=50_000
+        TRANSACTION_FILE, usecols=["TransactionID"], chunksize=50_000
     ):
-        transaction_ids.update(
-            chunk["TransactionID"]
-        )
+        transaction_ids.update(chunk["TransactionID"])
 
-    identity_ids = pd.read_csv(
-        IDENTITY_FILE,
-        usecols=["TransactionID"]
-    )
+    identity_ids = pd.read_csv(IDENTITY_FILE, usecols=["TransactionID"])
 
-    identity_id_set = set(
-        identity_ids["TransactionID"]
-    )
+    identity_id_set = set(identity_ids["TransactionID"])
 
-    matched = len(
-        transaction_ids.intersection(identity_id_set)
-    )
+    matched = len(transaction_ids.intersection(identity_id_set))
 
     total = len(transaction_ids)
 

@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 RAW_DATA_DIR = Path("data/raw")
 
 
@@ -14,9 +13,7 @@ def load_csv(file_name: str) -> pd.DataFrame:
     file_path = RAW_DATA_DIR / file_name
 
     if not file_path.exists():
-        raise FileNotFoundError(
-            f"Dataset not found: {file_path}"
-        )
+        raise FileNotFoundError(f"Dataset not found: {file_path}")
 
     print(f"Loading dataset: {file_path}")
 

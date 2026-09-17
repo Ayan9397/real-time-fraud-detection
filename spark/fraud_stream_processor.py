@@ -1,13 +1,12 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, from_json
 from pyspark.sql.types import (
-    StructField,
-    StructType,
-    StringType,
     DoubleType,
     LongType,
+    StringType,
+    StructField,
+    StructType,
 )
-
 
 KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 KAFKA_TOPIC = "fraud-transactions"
@@ -16,8 +15,7 @@ CHECKPOINT_LOCATION = "/tmp/fraud-detection-checkpoint"
 
 def create_spark_session():
     return (
-        SparkSession.builder
-        .appName("FraudDetectionStreamingProcessor")
+        SparkSession.builder.appName("FraudDetectionStreamingProcessor")
         .master("local[*]")
         .config("spark.sql.shuffle.partitions", "4")
         .getOrCreate()
@@ -67,8 +65,7 @@ def main():
     print("Connecting to Kafka...")
 
     kafka_stream = (
-        spark.readStream
-        .format("kafka")
+        spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
         .option("subscribe", KAFKA_TOPIC)
         .option("startingOffsets", "earliest")
@@ -76,36 +73,29 @@ def main():
         .load()
     )
 
-    transactions = (
-        kafka_stream
-        .selectExpr(
-            "CAST(key AS STRING) AS message_key",
-            "CAST(value AS STRING) AS message_value",
-            "topic",
-            "partition",
-            "offset",
-        )
+    transactions = kafka_stream.selectExpr(
+        "CAST(key AS STRING) AS message_key",
+        "CAST(value AS STRING) AS message_value",
+        "topic",
+        "partition",
+        "offset",
     )
 
-    parsed_transactions = (
-        transactions
-        .select(
-            "message_key",
-            "topic",
-            "partition",
-            "offset",
-            from_json(
-                col("message_value"),
-                schema,
-            ).alias("transaction"),
-        )
-        .select(
-            "message_key",
-            "topic",
-            "partition",
-            "offset",
-            "transaction.*",
-        )
+    parsed_transactions = transactions.select(
+        "message_key",
+        "topic",
+        "partition",
+        "offset",
+        from_json(
+            col("message_value"),
+            schema,
+        ).alias("transaction"),
+    ).select(
+        "message_key",
+        "topic",
+        "partition",
+        "offset",
+        "transaction.*",
     )
 
     processed_transactions = parsed_transactions.select(
@@ -139,9 +129,7 @@ def main():
     print()
 
     query = (
-        processed_transactions
-        .writeStream
-        .format("console")
+        processed_transactions.writeStream.format("console")
         .outputMode("append")
         .option("truncate", "false")
         .option("numRows", 20)

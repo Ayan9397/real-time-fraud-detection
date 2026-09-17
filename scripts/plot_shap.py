@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import shap
 
-
 SHAP_DIR = Path("models/shap")
 
 SHAP_VALUES_PATH = SHAP_DIR / "shap_values.npy"
@@ -21,31 +20,19 @@ def main() -> None:
     shap_values = np.load(SHAP_VALUES_PATH)
     processed_features = np.load(FEATURES_PATH)
 
-    feature_names = pd.read_csv(
-        NAMES_PATH
-    )["feature"].tolist()
+    feature_names = pd.read_csv(NAMES_PATH)["feature"].tolist()
 
-    print(
-        f"SHAP shape: {shap_values.shape}"
-    )
+    print(f"SHAP shape: {shap_values.shape}")
 
-    print(
-        f"Feature matrix shape: {processed_features.shape}"
-    )
+    print(f"Feature matrix shape: {processed_features.shape}")
 
-    print(
-        f"Feature names: {len(feature_names)}"
-    )
+    print(f"Feature names: {len(feature_names)}")
 
     if shap_values.shape != processed_features.shape:
-        raise ValueError(
-            "SHAP values and feature matrix have different shapes."
-        )
+        raise ValueError("SHAP values and feature matrix have different shapes.")
 
     if shap_values.shape[1] != len(feature_names):
-        raise ValueError(
-            "SHAP values and feature names have different feature counts."
-        )
+        raise ValueError("SHAP values and feature names have different feature counts.")
 
     OUTPUT_DIR.mkdir(
         parents=True,
@@ -58,19 +45,13 @@ def main() -> None:
 
     print("\nCreating global SHAP importance plot...")
 
-    mean_abs_shap = np.abs(
-        shap_values
-    ).mean(axis=0)
+    mean_abs_shap = np.abs(shap_values).mean(axis=0)
 
     top_n = 20
 
-    top_indices = np.argsort(
-        mean_abs_shap
-    )[-top_n:]
+    top_indices = np.argsort(mean_abs_shap)[-top_n:]
 
-    plt.figure(
-        figsize=(10, 8)
-    )
+    plt.figure(figsize=(10, 8))
 
     plt.barh(
         range(top_n),
@@ -79,19 +60,12 @@ def main() -> None:
 
     plt.yticks(
         range(top_n),
-        [
-            feature_names[i]
-            for i in top_indices
-        ],
+        [feature_names[i] for i in top_indices],
     )
 
-    plt.xlabel(
-        "Mean absolute SHAP value"
-    )
+    plt.xlabel("Mean absolute SHAP value")
 
-    plt.title(
-        "Top 20 Features by SHAP Importance"
-    )
+    plt.title("Top 20 Features by SHAP Importance")
 
     plt.tight_layout()
 
@@ -103,9 +77,7 @@ def main() -> None:
 
     plt.close()
 
-    print(
-        "Saved: global_shap_importance.png"
-    )
+    print("Saved: global_shap_importance.png")
 
     # ---------------------------------------------------------
     # 2. SHAP beeswarm plot
@@ -131,17 +103,13 @@ def main() -> None:
 
     plt.close()
 
-    print(
-        "Saved: shap_beeswarm.png"
-    )
+    print("Saved: shap_beeswarm.png")
 
     # ---------------------------------------------------------
     # 3. SHAP bar summary using SHAP itself
     # ---------------------------------------------------------
 
-    print(
-        "\nCreating SHAP summary bar plot..."
-    )
+    print("\nCreating SHAP summary bar plot...")
 
     shap.summary_plot(
         shap_values,
@@ -162,9 +130,7 @@ def main() -> None:
 
     plt.close()
 
-    print(
-        "Saved: shap_summary_bar.png"
-    )
+    print("Saved: shap_summary_bar.png")
 
     # ---------------------------------------------------------
     # 4. Save top SHAP features as CSV
@@ -185,9 +151,7 @@ def main() -> None:
         index=False,
     )
 
-    print(
-        "Saved: top_50_shap_features.csv"
-    )
+    print("Saved: top_50_shap_features.csv")
 
     # ---------------------------------------------------------
     # 5. Print top 20
@@ -195,19 +159,11 @@ def main() -> None:
 
     print("\nTop 20 SHAP features:")
 
-    print(
-        shap_importance.head(20).to_string(
-            index=False
-        )
-    )
+    print(shap_importance.head(20).to_string(index=False))
 
-    print(
-        "\nSHAP visualization completed successfully."
-    )
+    print("\nSHAP visualization completed successfully.")
 
-    print(
-        f"Plots saved to: {OUTPUT_DIR}"
-    )
+    print(f"Plots saved to: {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

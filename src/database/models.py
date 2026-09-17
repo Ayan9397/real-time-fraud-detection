@@ -6,10 +6,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
 
-
 # ---------------------------------------------------------
 # Transactions
 # ---------------------------------------------------------
+
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -122,6 +122,7 @@ class Transaction(Base):
 # ---------------------------------------------------------
 # Fraud predictions
 # ---------------------------------------------------------
+
 
 class FraudPrediction(Base):
     __tablename__ = "fraud_predictions"

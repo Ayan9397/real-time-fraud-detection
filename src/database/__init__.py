@@ -3,9 +3,9 @@ from src.database.models import FraudPrediction, Transaction
 
 __all__ = [
     "Base",
+    "FraudPrediction",
     "SessionLocal",
+    "Transaction",
     "engine",
     "get_db",
-    "Transaction",
-    "FraudPrediction",
 ]

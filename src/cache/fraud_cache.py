@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, Optional
+from typing import Any
 
 from src.cache.redis_client import RedisClient
 
@@ -28,7 +28,7 @@ class FraudCache:
     def set_prediction(
         self,
         transaction_id: int,
-        prediction: Dict[str, Any],
+        prediction: dict[str, Any],
     ) -> bool:
         """Cache a fraud prediction."""
         key = self._build_key(transaction_id)
@@ -47,7 +47,7 @@ class FraudCache:
     def get_prediction(
         self,
         transaction_id: int,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Retrieve a cached fraud prediction."""
         key = self._build_key(transaction_id)
 

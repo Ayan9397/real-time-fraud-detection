@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 DATA_FILE = Path("data/processed/train.csv")
 
 
@@ -31,41 +30,23 @@ def analyze_feature(df: pd.DataFrame, feature: str) -> None:
     missing = series.isna().sum()
     missing_rate = missing / len(df) * 100
 
-    print(
-        f"Missing: {missing:,} "
-        f"({missing_rate:.2f}%)"
-    )
+    print(f"Missing: {missing:,} " f"({missing_rate:.2f}%)")
 
-    print(
-        f"Unique values: "
-        f"{series.nunique(dropna=True):,}"
-    )
+    print(f"Unique values: " f"{series.nunique(dropna=True):,}")
 
     # Compare fraud rate for rows where
     # the feature exists vs where it is missing.
     missing_mask = series.isna()
 
-    fraud_missing = (
-        df.loc[missing_mask, "isFraud"].mean()
-        if missing_mask.any()
-        else 0
-    )
+    fraud_missing = df.loc[missing_mask, "isFraud"].mean() if missing_mask.any() else 0
 
     fraud_present = (
-        df.loc[~missing_mask, "isFraud"].mean()
-        if (~missing_mask).any()
-        else 0
+        df.loc[~missing_mask, "isFraud"].mean() if (~missing_mask).any() else 0
     )
 
-    print(
-        f"Fraud rate when missing: "
-        f"{fraud_missing:.4%}"
-    )
+    print(f"Fraud rate when missing: " f"{fraud_missing:.4%}")
 
-    print(
-        f"Fraud rate when present: "
-        f"{fraud_present:.4%}"
-    )
+    print(f"Fraud rate when present: " f"{fraud_present:.4%}")
 
     if pd.api.types.is_numeric_dtype(series):
 
@@ -101,9 +82,7 @@ def main():
         usecols=columns,
     )
 
-    print(
-        f"Rows loaded: {len(df):,}"
-    )
+    print(f"Rows loaded: {len(df):,}")
 
     for feature in TOP_FEATURES:
         analyze_feature(

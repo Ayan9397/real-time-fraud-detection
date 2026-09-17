@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import shap
 
-
 MODEL_PATH = Path("models/xgboost_missing_model.joblib")
 PREPROCESSOR_PATH = Path("models/xgboost_missing_preprocessor.joblib")
 VALID_PATH = Path("data/processed/valid.csv")
@@ -51,9 +50,7 @@ def main() -> None:
     id_column = "TransactionID"
 
     feature_columns = [
-        column
-        for column in df.columns
-        if column not in {target, id_column}
+        column for column in df.columns if column not in {target, id_column}
     ]
 
     # ---------------------------------------------------------
@@ -68,9 +65,7 @@ def main() -> None:
     )
 
     # Match exact training schema.
-    expected_columns = list(
-        preprocessor.feature_names_in_
-    )
+    expected_columns = list(preprocessor.feature_names_in_)
 
     X = X[expected_columns]
 
@@ -78,38 +73,24 @@ def main() -> None:
     # 2. Select one deterministic validation transaction
     # ---------------------------------------------------------
 
-    rng = np.random.RandomState(
-        RANDOM_STATE
-    )
+    rng = np.random.RandomState(RANDOM_STATE)
 
     selected_index = rng.randint(
         0,
         len(X),
     )
 
-    transaction = X.iloc[
-        [selected_index]
-    ].copy()
+    transaction = X.iloc[[selected_index]].copy()
 
-    original_transaction = df.iloc[
-        selected_index
-    ]
+    original_transaction = df.iloc[selected_index]
 
-    transaction_id = original_transaction[
-        id_column
-    ]
+    transaction_id = original_transaction[id_column]
 
-    actual_label = original_transaction[
-        target
-    ]
+    actual_label = original_transaction[target]
 
     print("\nSelected transaction:")
-    print(
-        f"TransactionID: {transaction_id}"
-    )
-    print(
-        f"Actual label: {actual_label}"
-    )
+    print(f"TransactionID: {transaction_id}")
+    print(f"Actual label: {actual_label}")
 
     # ---------------------------------------------------------
     # 3. Preprocess transaction
@@ -117,47 +98,29 @@ def main() -> None:
 
     print("\nApplying preprocessing...")
 
-    processed = preprocessor.transform(
-        transaction
-    )
+    processed = preprocessor.transform(transaction)
 
     if hasattr(processed, "toarray"):
         processed = processed.toarray()
 
-    processed = np.asarray(
-        processed
-    )
+    processed = np.asarray(processed)
 
-    feature_names = list(
-        preprocessor.get_feature_names_out()
-    )
+    feature_names = list(preprocessor.get_feature_names_out())
 
     # ---------------------------------------------------------
     # 4. Predict fraud probability
     # ---------------------------------------------------------
 
-    fraud_probability = float(
-        model.predict_proba(
-            processed
-        )[0, 1]
-    )
+    fraud_probability = float(model.predict_proba(processed)[0, 1])
 
-    print(
-        f"\nFraud probability: {fraud_probability:.6f}"
-    )
+    print(f"\nFraud probability: {fraud_probability:.6f}")
 
     # Project operating threshold selected earlier.
     threshold = 0.60
 
-    decision = (
-        "FRAUD REVIEW"
-        if fraud_probability >= threshold
-        else "LEGITIMATE"
-    )
+    decision = "FRAUD REVIEW" if fraud_probability >= threshold else "LEGITIMATE"
 
-    print(
-        f"Decision at threshold {threshold:.2f}: {decision}"
-    )
+    print(f"Decision at threshold {threshold:.2f}: {decision}")
 
     # ---------------------------------------------------------
     # 5. Calculate SHAP values
@@ -165,13 +128,9 @@ def main() -> None:
 
     print("\nCalculating SHAP explanation...")
 
-    explainer = shap.TreeExplainer(
-        model
-    )
+    explainer = shap.TreeExplainer(model)
 
-    shap_values = explainer.shap_values(
-        processed
-    )
+    shap_values = explainer.shap_values(processed)
 
     if isinstance(shap_values, list):
 
@@ -180,9 +139,7 @@ def main() -> None:
         else:
             shap_values = shap_values[0]
 
-    shap_values = np.asarray(
-        shap_values
-    )
+    shap_values = np.asarray(shap_values)
 
     # First/only transaction.
     values = shap_values[0]
@@ -208,9 +165,7 @@ def main() -> None:
     explanation = explanation.sort_values(
         "absolute_shap",
         ascending=False,
-    ).reset_index(
-        drop=True
-    )
+    ).reset_index(drop=True)
 
     # ---------------------------------------------------------
     # 7. Save explanation
@@ -221,10 +176,7 @@ def main() -> None:
         exist_ok=True,
     )
 
-    output_path = (
-        OUTPUT_DIR
-        / "individual_transaction_explanation.csv"
-    )
+    output_path = OUTPUT_DIR / "individual_transaction_explanation.csv"
 
     explanation.to_csv(
         output_path,
@@ -235,31 +187,19 @@ def main() -> None:
     # 8. Display strongest contributors
     # ---------------------------------------------------------
 
-    print(
-        "\nTop 10 factors influencing this prediction:"
-    )
+    print("\nTop 10 factors influencing this prediction:")
 
-    print(
-        explanation.head(10).to_string(
-            index=False
-        )
-    )
+    print(explanation.head(10).to_string(index=False))
 
     # ---------------------------------------------------------
     # 9. Separate fraud / legitimate contributors
     # ---------------------------------------------------------
 
-    fraud_factors = explanation[
-        explanation["shap_value"] > 0
-    ].head(10)
+    fraud_factors = explanation[explanation["shap_value"] > 0].head(10)
 
-    legitimate_factors = explanation[
-        explanation["shap_value"] < 0
-    ].head(10)
+    legitimate_factors = explanation[explanation["shap_value"] < 0].head(10)
 
-    print(
-        "\nTop factors pushing toward FRAUD:"
-    )
+    print("\nTop factors pushing toward FRAUD:")
 
     if fraud_factors.empty:
         print("None")
@@ -271,14 +211,10 @@ def main() -> None:
                     "feature",
                     "shap_value",
                 ]
-            ].to_string(
-                index=False
-            )
+            ].to_string(index=False)
         )
 
-    print(
-        "\nTop factors pushing toward LEGITIMATE:"
-    )
+    print("\nTop factors pushing toward LEGITIMATE:")
 
     if legitimate_factors.empty:
         print("None")
@@ -290,18 +226,12 @@ def main() -> None:
                     "feature",
                     "shap_value",
                 ]
-            ].to_string(
-                index=False
-            )
+            ].to_string(index=False)
         )
 
-    print(
-        "\nIndividual transaction explanation completed."
-    )
+    print("\nIndividual transaction explanation completed.")
 
-    print(
-        f"Saved to: {output_path}"
-    )
+    print(f"Saved to: {output_path}")
 
 
 if __name__ == "__main__":

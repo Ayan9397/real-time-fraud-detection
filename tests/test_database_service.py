@@ -76,9 +76,7 @@ def test_save_prediction():
     assert prediction.transaction_id == 999999998
     assert prediction.model_name == "fraud_detection_xgboost"
     assert prediction.model_version == "4"
-    assert prediction.fraud_probability == Decimal(
-        "0.043047092854976654"
-    )
+    assert prediction.fraud_probability == Decimal("0.043047092854976654")
     assert prediction.fraud_prediction is False
     assert prediction.decision == "LEGITIMATE"
     assert prediction.threshold == Decimal("0.6")

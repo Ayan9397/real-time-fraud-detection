@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import shap
 
-
 MODEL_PATH = Path("models/xgboost_missing_model.joblib")
 PREPROCESSOR_PATH = Path("models/xgboost_missing_preprocessor.joblib")
 VALID_PATH = Path("data/processed/valid.csv")
@@ -57,9 +56,7 @@ def main() -> None:
     id_column = "TransactionID"
 
     feature_columns = [
-        column
-        for column in df.columns
-        if column not in {target, id_column}
+        column for column in df.columns if column not in {target, id_column}
     ]
 
     print(f"Validation shape: {df.shape}")
@@ -76,44 +73,32 @@ def main() -> None:
         feature_columns,
     )
 
-    print(
-        f"Feature count after missing indicators: {X.shape[1]}"
-    )
+    print(f"Feature count after missing indicators: {X.shape[1]}")
 
     # ---------------------------------------------------------
     # 2. Match the exact schema used by the saved preprocessor
     # ---------------------------------------------------------
 
-    expected_columns = list(
-        preprocessor.feature_names_in_
-    )
+    expected_columns = list(preprocessor.feature_names_in_)
 
-    print(
-        f"Preprocessor expects: {len(expected_columns)} columns"
-    )
+    print(f"Preprocessor expects: {len(expected_columns)} columns")
 
     missing_columns = set(expected_columns) - set(X.columns)
 
     if missing_columns:
         raise ValueError(
-            "Required columns are missing from SHAP input: "
-            f"{missing_columns}"
+            "Required columns are missing from SHAP input: " f"{missing_columns}"
         )
 
     extra_columns = set(X.columns) - set(expected_columns)
 
     if extra_columns:
-        raise ValueError(
-            "Unexpected columns found in SHAP input: "
-            f"{extra_columns}"
-        )
+        raise ValueError("Unexpected columns found in SHAP input: " f"{extra_columns}")
 
     # Reorder exactly according to the fitted preprocessor.
     X = X[expected_columns]
 
-    print(
-        "Feature schema matched to saved preprocessor."
-    )
+    print("Feature schema matched to saved preprocessor.")
 
     # ---------------------------------------------------------
     # 3. Sample validation transactions
@@ -124,9 +109,7 @@ def main() -> None:
         len(X),
     )
 
-    rng = np.random.RandomState(
-        RANDOM_STATE
-    )
+    rng = np.random.RandomState(RANDOM_STATE)
 
     sample_indices = rng.choice(
         len(X),
@@ -136,9 +119,7 @@ def main() -> None:
 
     X_sample = X.iloc[sample_indices].copy()
 
-    print(
-        f"SHAP sample size: {len(X_sample)}"
-    )
+    print(f"SHAP sample size: {len(X_sample)}")
 
     # ---------------------------------------------------------
     # 4. Apply the exact saved preprocessing pipeline
@@ -146,38 +127,27 @@ def main() -> None:
 
     print("Applying preprocessing...")
 
-    X_processed = preprocessor.transform(
-        X_sample
-    )
+    X_processed = preprocessor.transform(X_sample)
 
     # Convert sparse matrix to dense if necessary.
     if hasattr(X_processed, "toarray"):
         X_processed = X_processed.toarray()
 
-    X_processed = np.asarray(
-        X_processed
-    )
+    X_processed = np.asarray(X_processed)
 
-    print(
-        f"Processed SHAP shape: {X_processed.shape}"
-    )
+    print(f"Processed SHAP shape: {X_processed.shape}")
 
     # ---------------------------------------------------------
     # 5. Get final processed feature names
     # ---------------------------------------------------------
 
-    feature_names = list(
-        preprocessor.get_feature_names_out()
-    )
+    feature_names = list(preprocessor.get_feature_names_out())
 
-    print(
-        f"Processed feature names: {len(feature_names)}"
-    )
+    print(f"Processed feature names: {len(feature_names)}")
 
     if X_processed.shape[1] != len(feature_names):
         raise ValueError(
-            "Feature count mismatch between processed "
-            "data and feature names."
+            "Feature count mismatch between processed " "data and feature names."
         )
 
     # ---------------------------------------------------------
@@ -186,9 +156,7 @@ def main() -> None:
 
     print("Creating SHAP TreeExplainer...")
 
-    explainer = shap.TreeExplainer(
-        model
-    )
+    explainer = shap.TreeExplainer(model)
 
     # ---------------------------------------------------------
     # 7. Calculate SHAP values
@@ -196,9 +164,7 @@ def main() -> None:
 
     print("Calculating SHAP values...")
 
-    shap_values = explainer.shap_values(
-        X_processed
-    )
+    shap_values = explainer.shap_values(X_processed)
 
     # Binary XGBoost compatibility.
     if isinstance(shap_values, list):
@@ -208,13 +174,9 @@ def main() -> None:
         else:
             shap_values = shap_values[0]
 
-    shap_values = np.asarray(
-        shap_values
-    )
+    shap_values = np.asarray(shap_values)
 
-    print(
-        f"SHAP value shape: {shap_values.shape}"
-    )
+    print(f"SHAP value shape: {shap_values.shape}")
 
     # ---------------------------------------------------------
     # 8. Validate SHAP dimensions
@@ -222,13 +184,10 @@ def main() -> None:
 
     if shap_values.shape != X_processed.shape:
         raise ValueError(
-            "SHAP values shape does not match "
-            "processed feature matrix."
+            "SHAP values shape does not match " "processed feature matrix."
         )
 
-    print(
-        "SHAP dimensions verified successfully."
-    )
+    print("SHAP dimensions verified successfully.")
 
     # ---------------------------------------------------------
     # 9. Create output directory
@@ -261,9 +220,7 @@ def main() -> None:
     # 12. Save feature names
     # ---------------------------------------------------------
 
-    pd.Series(
-        feature_names
-    ).to_csv(
+    pd.Series(feature_names).to_csv(
         OUTPUT_DIR / "feature_names.csv",
         index=False,
         header=["feature"],
@@ -273,9 +230,7 @@ def main() -> None:
     # 13. Calculate global SHAP importance
     # ---------------------------------------------------------
 
-    mean_abs_shap = np.abs(
-        shap_values
-    ).mean(axis=0)
+    mean_abs_shap = np.abs(shap_values).mean(axis=0)
 
     importance = pd.DataFrame(
         {
@@ -287,9 +242,7 @@ def main() -> None:
     importance = importance.sort_values(
         "mean_abs_shap",
         ascending=False,
-    ).reset_index(
-        drop=True
-    )
+    ).reset_index(drop=True)
 
     # ---------------------------------------------------------
     # 14. Save global SHAP importance
@@ -306,23 +259,15 @@ def main() -> None:
 
     print("\nTop 20 SHAP features:")
 
-    print(
-        importance.head(20).to_string(
-            index=False
-        )
-    )
+    print(importance.head(20).to_string(index=False))
 
     # ---------------------------------------------------------
     # 16. Completion
     # ---------------------------------------------------------
 
-    print(
-        "\nSHAP analysis completed successfully."
-    )
+    print("\nSHAP analysis completed successfully.")
 
-    print(
-        f"Results saved to: {OUTPUT_DIR}"
-    )
+    print(f"Results saved to: {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

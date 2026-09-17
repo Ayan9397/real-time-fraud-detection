@@ -10,7 +10,6 @@ from pyspark.sql.types import (
     StructType,
 )
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
@@ -42,8 +41,7 @@ TRANSACTION_SCHEMA = StructType(
 
 def create_spark_session() -> SparkSession:
     return (
-        SparkSession.builder
-        .master("local[2]")
+        SparkSession.builder.master("local[2]")
         .appName("FraudDetectionStreaming")
         .config("spark.sql.shuffle.partitions", "2")
         .config(
@@ -88,8 +86,7 @@ def main() -> None:
     print("Connecting Spark Structured Streaming to Kafka...")
 
     kafka_df = (
-        spark.readStream
-        .format("kafka")
+        spark.readStream.format("kafka")
         .option(
             "kafka.bootstrap.servers",
             KAFKA_BOOTSTRAP_SERVERS,
@@ -109,37 +106,28 @@ def main() -> None:
         .load()
     )
 
-    transactions = (
-        kafka_df
-        .select(
-            col("key").cast("string").alias("kafka_key"),
-            col("value").cast("string").alias("json_value"),
-            col("partition"),
-            col("offset"),
-        )
+    transactions = kafka_df.select(
+        col("key").cast("string").alias("kafka_key"),
+        col("value").cast("string").alias("json_value"),
+        col("partition"),
+        col("offset"),
     )
 
-    parsed_transactions = (
-        transactions
-        .withColumn(
-            "transaction",
-            from_json(
-                col("json_value"),
-                TRANSACTION_SCHEMA,
-            ),
-        )
-        .select(
-            "kafka_key",
-            "partition",
-            "offset",
-            "transaction.*",
-        )
+    parsed_transactions = transactions.withColumn(
+        "transaction",
+        from_json(
+            col("json_value"),
+            TRANSACTION_SCHEMA,
+        ),
+    ).select(
+        "kafka_key",
+        "partition",
+        "offset",
+        "transaction.*",
     )
 
     query = (
-        parsed_transactions
-        .writeStream
-        .format("console")
+        parsed_transactions.writeStream.format("console")
         .outputMode("append")
         .option("truncate", "false")
         .option("numRows", 20)

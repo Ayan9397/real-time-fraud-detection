@@ -1,11 +1,10 @@
-import sys
 import json
+import sys
 import time
 from pathlib import Path
 
 import pandas as pd
 import requests
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -19,18 +18,14 @@ SECOND_REQUEST_TIMEOUT = 30
 
 def load_test_transaction():
     if not DATASET_PATH.exists():
-        raise FileNotFoundError(
-            f"Validation dataset not found: {DATASET_PATH}"
-        )
+        raise FileNotFoundError(f"Validation dataset not found: {DATASET_PATH}")
 
     print(f"Loading dataset: {DATASET_PATH}")
 
     df = pd.read_csv(DATASET_PATH, nrows=1)
 
     if "TransactionID" not in df.columns:
-        raise RuntimeError(
-            "TransactionID column not found in validation dataset."
-        )
+        raise RuntimeError("TransactionID column not found in validation dataset.")
 
     row = df.iloc[0].to_dict()
 
@@ -150,41 +145,27 @@ def main():
     print()
     print("[5/5] Validating cache behavior...")
 
-    first_probability = float(
-        first_result["fraud_probability"]
-    )
+    first_probability = float(first_result["fraud_probability"])
 
-    second_probability = float(
-        second_result["fraud_probability"]
-    )
+    second_probability = float(second_result["fraud_probability"])
 
-    difference = abs(
-        first_probability - second_probability
-    )
+    difference = abs(first_probability - second_probability)
 
     print(f"First probability:  {first_probability:.10f}")
     print(f"Second probability: {second_probability:.10f}")
     print(f"Probability difference: {difference:.12f}")
 
     if difference > 1e-6:
-        raise AssertionError(
-            "Fraud probabilities are inconsistent."
-        )
+        raise AssertionError("Fraud probabilities are inconsistent.")
 
     if first_result.get("success") is not True:
-        raise AssertionError(
-            "First API request failed."
-        )
+        raise AssertionError("First API request failed.")
 
     if second_result.get("success") is not True:
-        raise AssertionError(
-            "Second API request failed."
-        )
+        raise AssertionError("Second API request failed.")
 
     if second_result.get("cache_hit") is not True:
-        raise AssertionError(
-            "Second request was not served from Redis cache."
-        )
+        raise AssertionError("Second request was not served from Redis cache.")
 
     print()
     print("=" * 60)

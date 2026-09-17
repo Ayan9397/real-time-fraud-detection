@@ -1,6 +1,6 @@
 import json
-from kafka import KafkaConsumer
 
+from kafka import KafkaConsumer
 
 KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 KAFKA_TOPIC = "fraud-transactions"
@@ -14,9 +14,7 @@ def create_consumer():
         group_id=KAFKA_GROUP_ID,
         auto_offset_reset="earliest",
         enable_auto_commit=True,
-        value_deserializer=lambda value: json.loads(
-            value.decode("utf-8")
-        ),
+        value_deserializer=lambda value: json.loads(value.decode("utf-8")),
     )
 
 
@@ -41,17 +39,11 @@ def main():
         for message in consumer:
             transaction = message.value
 
-            transaction_id = transaction.get(
-                "TransactionID"
-            )
+            transaction_id = transaction.get("TransactionID")
 
-            transaction_amt = transaction.get(
-                "TransactionAmt"
-            )
+            transaction_amt = transaction.get("TransactionAmt")
 
-            product_cd = transaction.get(
-                "ProductCD"
-            )
+            product_cd = transaction.get("ProductCD")
 
             print("=" * 60)
             print("TRANSACTION RECEIVED")

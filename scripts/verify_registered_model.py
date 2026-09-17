@@ -3,7 +3,6 @@ from pathlib import Path
 import mlflow
 import pandas as pd
 
-
 # ============================================================
 # PROJECT PATHS
 # ============================================================
@@ -21,6 +20,7 @@ MODEL_VERSION = "2"
 # ============================================================
 # MAIN
 # ============================================================
+
 
 def main():
 
@@ -43,9 +43,7 @@ def main():
     # Model URI
     # --------------------------------------------------------
 
-    model_uri = (
-        f"models:/{REGISTERED_MODEL}/{MODEL_VERSION}"
-    )
+    model_uri = f"models:/{REGISTERED_MODEL}/{MODEL_VERSION}"
 
     print("\nLoading registered model:")
     print(model_uri)
@@ -65,9 +63,7 @@ def main():
     print("\nLoading validation data...")
 
     if not VALIDATION_DATA.exists():
-        raise FileNotFoundError(
-            f"Validation dataset not found: {VALIDATION_DATA}"
-        )
+        raise FileNotFoundError(f"Validation dataset not found: {VALIDATION_DATA}")
 
     df = pd.read_csv(VALIDATION_DATA)
 
@@ -86,10 +82,7 @@ def main():
     # Prepare input
     # --------------------------------------------------------
 
-    X_sample = sample.drop(
-        columns=["isFraud"],
-        errors="ignore"
-    )
+    X_sample = sample.drop(columns=["isFraud"], errors="ignore")
 
     # --------------------------------------------------------
     # Generate predictions
@@ -109,18 +102,10 @@ def main():
     results = pd.DataFrame(predictions)
 
     if "TransactionID" in sample.columns:
-        results.insert(
-            0,
-            "TransactionID",
-            sample["TransactionID"].values
-        )
+        results.insert(0, "TransactionID", sample["TransactionID"].values)
 
     if "isFraud" in sample.columns:
-        results.insert(
-            1,
-            "actual_isFraud",
-            sample["isFraud"].values
-        )
+        results.insert(1, "actual_isFraud", sample["isFraud"].values)
 
     print(results.to_string(index=False))
 
@@ -137,18 +122,11 @@ def main():
     missing_columns = required_columns - set(results.columns)
 
     if missing_columns:
-        raise ValueError(
-            f"Missing prediction columns: {missing_columns}"
-        )
+        raise ValueError(f"Missing prediction columns: {missing_columns}")
 
-    if not results["fraud_probability"].between(
-        0,
-        1
-    ).all():
+    if not results["fraud_probability"].between(0, 1).all():
 
-        raise ValueError(
-            "Fraud probabilities must be between 0 and 1."
-        )
+        raise ValueError("Fraud probabilities must be between 0 and 1.")
 
     print("\n" + "=" * 70)
     print("REGISTERED MODEL VERIFICATION PASSED")

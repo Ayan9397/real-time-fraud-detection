@@ -5,7 +5,6 @@ from sqlalchemy import delete, select
 from src.database.connection import SessionLocal
 from src.database.models import FraudPrediction, Transaction
 
-
 TEST_TRANSACTION_ID = 999999999
 
 
@@ -30,9 +29,7 @@ def main() -> None:
         )
 
         db.execute(
-            delete(Transaction).where(
-                Transaction.transaction_id == TEST_TRANSACTION_ID
-            )
+            delete(Transaction).where(Transaction.transaction_id == TEST_TRANSACTION_ID)
         )
 
         db.commit()
@@ -127,32 +124,19 @@ def main() -> None:
 
         prediction_statement = (
             select(FraudPrediction)
-            .where(
-                FraudPrediction.transaction_id == TEST_TRANSACTION_ID
-            )
+            .where(FraudPrediction.transaction_id == TEST_TRANSACTION_ID)
             .order_by(FraudPrediction.created_at.desc())
         )
 
         stored_prediction = db.scalar(prediction_statement)
 
         if stored_prediction is None:
-            raise RuntimeError(
-                "Fraud prediction could not be retrieved."
-            )
+            raise RuntimeError("Fraud prediction could not be retrieved.")
 
         print("Fraud prediction retrieved successfully.")
-        print(
-            f"Probability: "
-            f"{stored_prediction.fraud_probability}"
-        )
-        print(
-            f"Prediction: "
-            f"{stored_prediction.fraud_prediction}"
-        )
-        print(
-            f"Decision: "
-            f"{stored_prediction.decision}"
-        )
+        print(f"Probability: " f"{stored_prediction.fraud_probability}")
+        print(f"Prediction: " f"{stored_prediction.fraud_prediction}")
+        print(f"Decision: " f"{stored_prediction.decision}")
 
         # -------------------------------------------------
         # VERIFY FOREIGN KEY RELATIONSHIP
@@ -161,9 +145,7 @@ def main() -> None:
         print("\n6. Verifying transaction relationship...")
 
         if stored_prediction.transaction_id != stored_transaction.transaction_id:
-            raise RuntimeError(
-                "Foreign-key relationship verification failed."
-            )
+            raise RuntimeError("Foreign-key relationship verification failed.")
 
         print("Foreign-key relationship verified.")
 

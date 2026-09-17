@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from sqlalchemy import URL, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-
 # ---------------------------------------------------------
 # Project configuration
 # ---------------------------------------------------------
@@ -28,8 +27,7 @@ DB_NAME = os.getenv("POSTGRES_DB", "fraud_detection")
 
 if not DB_PASSWORD:
     raise RuntimeError(
-        "POSTGRES_PASSWORD is not configured. "
-        "Add it to the project's .env file."
+        "POSTGRES_PASSWORD is not configured. " "Add it to the project's .env file."
     )
 
 
@@ -74,6 +72,7 @@ engine = create_engine(
 # SQLAlchemy declarative base
 # ---------------------------------------------------------
 
+
 class Base(DeclarativeBase):
     pass
 
@@ -94,6 +93,7 @@ SessionLocal = sessionmaker(
 # Database dependency
 # ---------------------------------------------------------
 
+
 def get_db():
     """
     Provide a SQLAlchemy database session.
@@ -112,6 +112,7 @@ def get_db():
 # ---------------------------------------------------------
 # Database connection test
 # ---------------------------------------------------------
+
 
 def test_connection() -> None:
     """

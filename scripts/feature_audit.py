@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 DATA_FILE = Path("data/processed/fraud_dataset.csv")
 
 
@@ -21,39 +20,24 @@ def audit_features() -> None:
 
     print("Target column: isFraud")
 
-    print(
-        df["isFraud"]
-        .value_counts()
-        .sort_index()
-    )
+    print(df["isFraud"].value_counts().sort_index())
 
     print("\n" + "=" * 70)
     print("IDENTIFIER COLUMNS")
     print("=" * 70)
 
-    identifier_candidates = [
-        column
-        for column in df.columns
-        if "id" in column.lower()
-    ]
+    identifier_candidates = [column for column in df.columns if "id" in column.lower()]
 
     for column in identifier_candidates:
-        print(
-            f"{column}: "
-            f"{df[column].nunique(dropna=True):,} unique values"
-        )
+        print(f"{column}: " f"{df[column].nunique(dropna=True):,} unique values")
 
     print("\n" + "=" * 70)
     print("NUMERIC / CATEGORICAL FEATURES")
     print("=" * 70)
 
-    numeric_columns = df.select_dtypes(
-        include=["number"]
-    ).columns
+    numeric_columns = df.select_dtypes(include=["number"]).columns
 
-    categorical_columns = df.select_dtypes(
-        exclude=["number"]
-    ).columns
+    categorical_columns = df.select_dtypes(exclude=["number"]).columns
 
     print(f"Numeric columns: {len(numeric_columns)}")
     print(f"Categorical columns: {len(categorical_columns)}")
@@ -61,10 +45,7 @@ def audit_features() -> None:
     print("\nCategorical columns:")
 
     for column in categorical_columns:
-        print(
-            f"  {column}: "
-            f"{df[column].nunique(dropna=True):,} unique values"
-        )
+        print(f"  {column}: " f"{df[column].nunique(dropna=True):,} unique values")
 
     print("\n" + "=" * 70)
     print("HIGH-CARDINALITY FEATURES")
@@ -72,16 +53,11 @@ def audit_features() -> None:
 
     for column in df.columns:
 
-        unique_count = df[column].nunique(
-            dropna=True
-        )
+        unique_count = df[column].nunique(dropna=True)
 
         if unique_count > 1000:
 
-            print(
-                f"{column}: "
-                f"{unique_count:,} unique values"
-            )
+            print(f"{column}: " f"{unique_count:,} unique values")
 
     print("\n" + "=" * 70)
     print("TARGET LEAKAGE CHECK")

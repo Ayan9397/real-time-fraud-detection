@@ -2,7 +2,6 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-
 from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
@@ -11,16 +10,11 @@ from sklearn.metrics import (
     recall_score,
 )
 
-
 VALID_FILE = Path("data/processed/valid.csv")
 
-MODEL_FILE = Path(
-    "models/xgboost_missing_model.joblib"
-)
+MODEL_FILE = Path("models/xgboost_missing_model.joblib")
 
-PREPROCESSOR_FILE = Path(
-    "models/xgboost_missing_preprocessor.joblib"
-)
+PREPROCESSOR_FILE = Path("models/xgboost_missing_preprocessor.joblib")
 
 TARGET = "isFraud"
 ID_COLUMN = "TransactionID"
@@ -28,9 +22,7 @@ ID_COLUMN = "TransactionID"
 
 def evaluate_threshold(y_true, probabilities, threshold):
 
-    predictions = (
-        probabilities >= threshold
-    ).astype(int)
+    predictions = (probabilities >= threshold).astype(int)
 
     precision = precision_score(
         y_true,
@@ -81,9 +73,7 @@ def main():
 
     print("\nLoading validation dataset...")
 
-    valid_df = pd.read_csv(
-        VALID_FILE
-    )
+    valid_df = pd.read_csv(VALID_FILE)
 
     print(
         "Validation shape:",
@@ -103,19 +93,11 @@ def main():
     # Recreate missingness indicators
     # ---------------------------------------------------------
 
-    print(
-        "\nCreating missingness indicators..."
-    )
+    print("\nCreating missingness indicators...")
 
-    missing_valid = (
-        X_valid.isna()
-        .astype("int8")
-    )
+    missing_valid = X_valid.isna().astype("int8")
 
-    missing_valid.columns = [
-        f"{column}_missing"
-        for column in missing_valid.columns
-    ]
+    missing_valid.columns = [f"{column}_missing" for column in missing_valid.columns]
 
     X_valid = pd.concat(
         [
@@ -129,31 +111,19 @@ def main():
     # Load preprocessing and model
     # ---------------------------------------------------------
 
-    print(
-        "\nLoading model and preprocessor..."
-    )
+    print("\nLoading model and preprocessor...")
 
-    preprocessor = joblib.load(
-        PREPROCESSOR_FILE
-    )
+    preprocessor = joblib.load(PREPROCESSOR_FILE)
 
-    model = joblib.load(
-        MODEL_FILE
-    )
+    model = joblib.load(MODEL_FILE)
 
     # ---------------------------------------------------------
     # Transform validation data
     # ---------------------------------------------------------
 
-    print(
-        "Transforming validation data..."
-    )
+    print("Transforming validation data...")
 
-    X_valid_processed = (
-        preprocessor.transform(
-            X_valid
-        )
-    )
+    X_valid_processed = preprocessor.transform(X_valid)
 
     print(
         "Processed shape:",
@@ -164,22 +134,16 @@ def main():
     # Generate probabilities
     # ---------------------------------------------------------
 
-    print(
-        "\nGenerating fraud probabilities..."
-    )
+    print("\nGenerating fraud probabilities...")
 
-    probabilities = model.predict_proba(
-        X_valid_processed
-    )[:, 1]
+    probabilities = model.predict_proba(X_valid_processed)[:, 1]
 
     pr_auc = average_precision_score(
         y_valid,
         probabilities,
     )
 
-    print(
-        f"Validation PR-AUC: {pr_auc:.4f}"
-    )
+    print(f"Validation PR-AUC: {pr_auc:.4f}")
 
     # ---------------------------------------------------------
     # Test thresholds
@@ -217,9 +181,7 @@ def main():
 
         results.append(result)
 
-    results_df = pd.DataFrame(
-        results
-    )
+    results_df = pd.DataFrame(results)
 
     # ---------------------------------------------------------
     # Display results
@@ -239,17 +201,12 @@ def main():
     ]
 
     print(
-        results_df[
-            display_columns
-        ].to_string(
+        results_df[display_columns].to_string(
             index=False,
             formatters={
-                "precision":
-                    "{:.4f}".format,
-                "recall":
-                    "{:.4f}".format,
-                "f1":
-                    "{:.4f}".format,
+                "precision": "{:.4f}".format,
+                "recall": "{:.4f}".format,
+                "f1": "{:.4f}".format,
             },
         )
     )
@@ -258,131 +215,69 @@ def main():
     # Best F1
     # ---------------------------------------------------------
 
-    best_f1 = results_df.loc[
-        results_df["f1"].idxmax()
-    ]
+    best_f1 = results_df.loc[results_df["f1"].idxmax()]
 
     print("\n" + "=" * 70)
     print("BEST F1 THRESHOLD")
     print("=" * 70)
 
-    print(
-        f"Threshold: "
-        f"{best_f1['threshold']:.2f}"
-    )
+    print(f"Threshold: " f"{best_f1['threshold']:.2f}")
 
-    print(
-        f"Precision: "
-        f"{best_f1['precision']:.4f}"
-    )
+    print(f"Precision: " f"{best_f1['precision']:.4f}")
 
-    print(
-        f"Recall: "
-        f"{best_f1['recall']:.4f}"
-    )
+    print(f"Recall: " f"{best_f1['recall']:.4f}")
 
-    print(
-        f"F1: "
-        f"{best_f1['f1']:.4f}"
-    )
+    print(f"F1: " f"{best_f1['f1']:.4f}")
 
     # ---------------------------------------------------------
     # Best precision while maintaining recall >= 50%
     # ---------------------------------------------------------
 
-    recall_50 = results_df[
-        results_df["recall"] >= 0.50
-    ]
+    recall_50 = results_df[results_df["recall"] >= 0.50]
 
     if not recall_50.empty:
 
-        best_precision_50 = (
-            recall_50.loc[
-                recall_50[
-                    "precision"
-                ].idxmax()
-            ]
-        )
+        best_precision_50 = recall_50.loc[recall_50["precision"].idxmax()]
 
         print("\n" + "=" * 70)
-        print(
-            "BEST PRECISION "
-            "WITH RECALL >= 50%"
-        )
+        print("BEST PRECISION " "WITH RECALL >= 50%")
         print("=" * 70)
 
-        print(
-            f"Threshold: "
-            f"{best_precision_50['threshold']:.2f}"
-        )
+        print(f"Threshold: " f"{best_precision_50['threshold']:.2f}")
 
-        print(
-            f"Precision: "
-            f"{best_precision_50['precision']:.4f}"
-        )
+        print(f"Precision: " f"{best_precision_50['precision']:.4f}")
 
-        print(
-            f"Recall: "
-            f"{best_precision_50['recall']:.4f}"
-        )
+        print(f"Recall: " f"{best_precision_50['recall']:.4f}")
 
-        print(
-            f"F1: "
-            f"{best_precision_50['f1']:.4f}"
-        )
+        print(f"F1: " f"{best_precision_50['f1']:.4f}")
 
     # ---------------------------------------------------------
     # Best recall while maintaining precision >= 50%
     # ---------------------------------------------------------
 
-    precision_50 = results_df[
-        results_df["precision"] >= 0.50
-    ]
+    precision_50 = results_df[results_df["precision"] >= 0.50]
 
     if not precision_50.empty:
 
-        best_recall_50 = (
-            precision_50.loc[
-                precision_50[
-                    "recall"
-                ].idxmax()
-            ]
-        )
+        best_recall_50 = precision_50.loc[precision_50["recall"].idxmax()]
 
         print("\n" + "=" * 70)
-        print(
-            "BEST RECALL "
-            "WITH PRECISION >= 50%"
-        )
+        print("BEST RECALL " "WITH PRECISION >= 50%")
         print("=" * 70)
 
-        print(
-            f"Threshold: "
-            f"{best_recall_50['threshold']:.2f}"
-        )
+        print(f"Threshold: " f"{best_recall_50['threshold']:.2f}")
 
-        print(
-            f"Precision: "
-            f"{best_recall_50['precision']:.4f}"
-        )
+        print(f"Precision: " f"{best_recall_50['precision']:.4f}")
 
-        print(
-            f"Recall: "
-            f"{best_recall_50['recall']:.4f}"
-        )
+        print(f"Recall: " f"{best_recall_50['recall']:.4f}")
 
-        print(
-            f"F1: "
-            f"{best_recall_50['f1']:.4f}"
-        )
+        print(f"F1: " f"{best_recall_50['f1']:.4f}")
 
     # ---------------------------------------------------------
     # Save results
     # ---------------------------------------------------------
 
-    output_file = Path(
-        "models/threshold_results.csv"
-    )
+    output_file = Path("models/threshold_results.csv")
 
     results_df.to_csv(
         output_file,
@@ -393,9 +288,7 @@ def main():
     print("RESULTS SAVED")
     print("=" * 70)
 
-    print(
-        f"File: {output_file}"
-    )
+    print(f"File: {output_file}")
 
 
 if __name__ == "__main__":

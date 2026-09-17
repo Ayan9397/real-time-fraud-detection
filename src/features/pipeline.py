@@ -1,4 +1,3 @@
-
 from pathlib import Path
 
 import joblib
@@ -20,13 +19,9 @@ class FraudFeaturePipeline:
 
         X = dataframe.drop(columns=["isFraud"])
 
-        numeric_features = X.select_dtypes(
-            include=["number"]
-        ).columns.tolist()
+        numeric_features = X.select_dtypes(include=["number"]).columns.tolist()
 
-        categorical_features = X.select_dtypes(
-            exclude=["number"]
-        ).columns.tolist()
+        categorical_features = X.select_dtypes(exclude=["number"]).columns.tolist()
 
         # Remove TransactionID because it's only an identifier.
         if "TransactionID" in numeric_features:

@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 RAW_DATA_DIR = Path("data/raw")
 
 TRANSACTION_FILE = RAW_DATA_DIR / "train_transaction.csv"
@@ -62,9 +61,7 @@ def check_target() -> None:
         counts = chunk["isFraud"].value_counts()
 
         for value, count in counts.items():
-            target_counts[value] = (
-                target_counts.get(value, 0) + count
-            )
+            target_counts[value] = target_counts.get(value, 0) + count
 
     print("Target values:")
 

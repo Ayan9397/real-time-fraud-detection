@@ -2,8 +2,6 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-from xgboost import XGBClassifier
-
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
@@ -17,7 +15,7 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
-
+from xgboost import XGBClassifier
 
 DATA_DIR = Path("data/processed")
 MODEL_DIR = Path("models")
@@ -31,8 +29,7 @@ def get_features(df):
     features = [
         column
         for column in df.columns
-        if column != TARGET
-        and column != "TransactionID"
+        if column != TARGET and column != "TransactionID"
     ]
 
     return features
@@ -49,30 +46,19 @@ def load_dataset(filename):
 
 def build_preprocessor(X):
 
-    numeric_features = X.select_dtypes(
-        include=["number"]
-    ).columns.tolist()
+    numeric_features = X.select_dtypes(include=["number"]).columns.tolist()
 
-    categorical_features = X.select_dtypes(
-        exclude=["number"]
-    ).columns.tolist()
+    categorical_features = X.select_dtypes(exclude=["number"]).columns.tolist()
 
-    print(
-        f"Numeric features: {len(numeric_features)}"
-    )
+    print(f"Numeric features: {len(numeric_features)}")
 
-    print(
-        f"Categorical features: "
-        f"{len(categorical_features)}"
-    )
+    print(f"Categorical features: " f"{len(categorical_features)}")
 
     numeric_pipeline = Pipeline(
         steps=[
             (
                 "imputer",
-                SimpleImputer(
-                    strategy="median"
-                ),
+                SimpleImputer(strategy="median"),
             )
         ]
     )
@@ -118,9 +104,7 @@ def evaluate(model, X, y, name):
 
     probabilities = model.predict_proba(X)[:, 1]
 
-    predictions = (
-        probabilities >= 0.5
-    ).astype(int)
+    predictions = (probabilities >= 0.5).astype(int)
 
     precision = precision_score(
         y,
@@ -198,91 +182,53 @@ def main():
 
     train = load_dataset("train.csv")
 
-    print(
-        f"Train shape: {train.shape}"
-    )
+    print(f"Train shape: {train.shape}")
 
     print("\nLoading validation data...")
 
     valid = load_dataset("valid.csv")
 
-    print(
-        f"Validation shape: {valid.shape}"
-    )
+    print(f"Validation shape: {valid.shape}")
 
-    X_train = train.drop(
-        columns=[TARGET, "TransactionID"]
-    )
+    X_train = train.drop(columns=[TARGET, "TransactionID"])
 
     y_train = train[TARGET]
 
-    X_valid = valid.drop(
-        columns=[TARGET, "TransactionID"]
-    )
+    X_valid = valid.drop(columns=[TARGET, "TransactionID"])
 
     y_valid = valid[TARGET]
 
     print("\nPreparing preprocessing pipeline...")
 
-    preprocessor = build_preprocessor(
-        X_train
-    )
+    preprocessor = build_preprocessor(X_train)
 
     print("\nFitting preprocessing...")
 
-    X_train_transformed = (
-        preprocessor.fit_transform(
-            X_train
-        )
-    )
+    X_train_transformed = preprocessor.fit_transform(X_train)
 
-    print(
-        "Training data transformed."
-    )
+    print("Training data transformed.")
 
-    print(
-        f"Transformed shape: "
-        f"{X_train_transformed.shape}"
-    )
+    print(f"Transformed shape: " f"{X_train_transformed.shape}")
 
     print("\nTransforming validation data...")
 
-    X_valid_transformed = (
-        preprocessor.transform(
-            X_valid
-        )
-    )
+    X_valid_transformed = preprocessor.transform(X_valid)
 
-    print(
-        "Validation data transformed."
-    )
+    print("Validation data transformed.")
 
     fraud_count = y_train.sum()
 
-    legitimate_count = (
-        len(y_train) - fraud_count
-    )
+    legitimate_count = len(y_train) - fraud_count
 
-    scale_pos_weight = (
-        legitimate_count / fraud_count
-    )
+    scale_pos_weight = legitimate_count / fraud_count
 
     print("\nClass balance:")
 
-    print(
-        f"Legitimate: "
-        f"{legitimate_count:,}"
-    )
+    print(f"Legitimate: " f"{legitimate_count:,}")
 
-    print(
-        f"Fraud: "
-        f"{fraud_count:,}"
-    )
+    print(f"Fraud: " f"{fraud_count:,}")
 
-    print(
-        f"scale_pos_weight: "
-        f"{scale_pos_weight:.4f}"
-    )
+    print(f"scale_pos_weight: " f"{scale_pos_weight:.4f}")
 
     print("\nCreating XGBoost model...")
 
@@ -336,15 +282,9 @@ def main():
         exist_ok=True,
     )
 
-    model_path = (
-        MODEL_DIR
-        / "xgboost_fraud_model.joblib"
-    )
+    model_path = MODEL_DIR / "xgboost_fraud_model.joblib"
 
-    preprocessor_path = (
-        MODEL_DIR
-        / "xgboost_preprocessor.joblib"
-    )
+    preprocessor_path = MODEL_DIR / "xgboost_preprocessor.joblib"
 
     joblib.dump(
         model,
@@ -360,14 +300,9 @@ def main():
     print("MODEL ARTIFACTS SAVED")
     print("=" * 70)
 
-    print(
-        f"Model: {model_path}"
-    )
+    print(f"Model: {model_path}")
 
-    print(
-        f"Preprocessor: "
-        f"{preprocessor_path}"
-    )
+    print(f"Preprocessor: " f"{preprocessor_path}")
 
 
 if __name__ == "__main__":

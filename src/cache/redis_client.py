@@ -1,10 +1,8 @@
 import os
 from pathlib import Path
-from typing import Optional
 
 import redis
 from dotenv import load_dotenv
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env")
@@ -24,7 +22,7 @@ class RedisClient:
         host: str = REDIS_HOST,
         port: int = REDIS_PORT,
         db: int = REDIS_DB,
-        password: Optional[str] = REDIS_PASSWORD,
+        password: str | None = REDIS_PASSWORD,
     ) -> None:
         self.client = redis.Redis(
             host=host,
@@ -45,7 +43,7 @@ class RedisClient:
         self,
         key: str,
         value: str,
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
     ) -> bool:
         """Store a value in Redis, optionally with a TTL."""
         return bool(
@@ -56,7 +54,7 @@ class RedisClient:
             )
         )
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         """Retrieve a value from Redis."""
         return self.client.get(key)
 

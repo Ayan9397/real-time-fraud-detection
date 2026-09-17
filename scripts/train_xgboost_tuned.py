@@ -2,7 +2,6 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
@@ -15,9 +14,7 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
-
 from xgboost import XGBClassifier
-
 
 TRAIN_FILE = Path("data/processed/train.csv")
 VALID_FILE = Path("data/processed/valid.csv")
@@ -31,19 +28,11 @@ def evaluate_model(model, X, y, dataset_name):
     probabilities = model.predict_proba(X)[:, 1]
     predictions = (probabilities >= 0.5).astype(int)
 
-    precision = precision_score(
-        y, predictions, zero_division=0
-    )
-    recall = recall_score(
-        y, predictions, zero_division=0
-    )
-    f1 = f1_score(
-        y, predictions, zero_division=0
-    )
+    precision = precision_score(y, predictions, zero_division=0)
+    recall = recall_score(y, predictions, zero_division=0)
+    f1 = f1_score(y, predictions, zero_division=0)
     roc_auc = roc_auc_score(y, probabilities)
-    pr_auc = average_precision_score(
-        y, probabilities
-    )
+    pr_auc = average_precision_score(y, probabilities)
 
     print("\n" + "=" * 70)
     print(dataset_name)
@@ -84,31 +73,20 @@ def main():
     y_train = train_df[TARGET]
     y_valid = valid_df[TARGET]
 
-    X_train = train_df.drop(
-        columns=[TARGET, ID_COLUMN]
-    ).copy()
+    X_train = train_df.drop(columns=[TARGET, ID_COLUMN]).copy()
 
-    X_valid = valid_df.drop(
-        columns=[TARGET, ID_COLUMN]
-    ).copy()
+    X_valid = valid_df.drop(columns=[TARGET, ID_COLUMN]).copy()
 
     # ---------------------------------------------------------
     # Feature types
     # ---------------------------------------------------------
 
-    numeric_features = X_train.select_dtypes(
-        include=["number"]
-    ).columns.tolist()
+    numeric_features = X_train.select_dtypes(include=["number"]).columns.tolist()
 
-    categorical_features = X_train.select_dtypes(
-        exclude=["number"]
-    ).columns.tolist()
+    categorical_features = X_train.select_dtypes(exclude=["number"]).columns.tolist()
 
     print("\nNumeric features:", len(numeric_features))
-    print(
-        "Categorical features:",
-        len(categorical_features)
-    )
+    print("Categorical features:", len(categorical_features))
 
     # ---------------------------------------------------------
     # Missingness indicators
@@ -119,104 +97,52 @@ def main():
     missing_train = X_train.isna().astype("int8")
     missing_valid = X_valid.isna().astype("int8")
 
-    missing_train.columns = [
-        f"{column}_missing"
-        for column in missing_train.columns
-    ]
+    missing_train.columns = [f"{column}_missing" for column in missing_train.columns]
 
-    missing_valid.columns = [
-        f"{column}_missing"
-        for column in missing_valid.columns
-    ]
+    missing_valid.columns = [f"{column}_missing" for column in missing_valid.columns]
 
-    X_train = pd.concat(
-        [X_train, missing_train],
-        axis=1
-    )
+    X_train = pd.concat([X_train, missing_train], axis=1)
 
-    X_valid = pd.concat(
-        [X_valid, missing_valid],
-        axis=1
-    )
+    X_valid = pd.concat([X_valid, missing_valid], axis=1)
 
     missing_features = missing_train.columns.tolist()
 
-    numeric_features_extended = (
-        numeric_features + missing_features
-    )
+    numeric_features_extended = numeric_features + missing_features
 
-    print(
-        "Features after indicators:",
-        X_train.shape[1]
-    )
+    print("Features after indicators:", X_train.shape[1])
 
     # ---------------------------------------------------------
     # Preprocessing
     # ---------------------------------------------------------
 
-    numeric_pipeline = Pipeline(
-        steps=[
-            (
-                "imputer",
-                SimpleImputer(
-                    strategy="median"
-                )
-            )
-        ]
-    )
+    numeric_pipeline = Pipeline(steps=[("imputer", SimpleImputer(strategy="median"))])
 
     categorical_pipeline = Pipeline(
         steps=[
-            (
-                "imputer",
-                SimpleImputer(
-                    strategy="most_frequent"
-                )
-            ),
+            ("imputer", SimpleImputer(strategy="most_frequent")),
             (
                 "encoder",
-                OrdinalEncoder(
-                    handle_unknown="use_encoded_value",
-                    unknown_value=-1
-                )
-            )
+                OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
+            ),
         ]
     )
 
     preprocessor = ColumnTransformer(
         transformers=[
-            (
-                "numeric",
-                numeric_pipeline,
-                numeric_features_extended
-            ),
-            (
-                "categorical",
-                categorical_pipeline,
-                categorical_features
-            )
+            ("numeric", numeric_pipeline, numeric_features_extended),
+            ("categorical", categorical_pipeline, categorical_features),
         ]
     )
 
     print("\nFitting preprocessing...")
 
-    X_train_processed = preprocessor.fit_transform(
-        X_train
-    )
+    X_train_processed = preprocessor.fit_transform(X_train)
 
-    X_valid_processed = preprocessor.transform(
-        X_valid
-    )
+    X_valid_processed = preprocessor.transform(X_valid)
 
-    print(
-        "Processed train shape:",
-        X_train_processed.shape
-    )
+    print("Processed train shape:", X_train_processed.shape)
 
-    print(
-        "Processed validation shape:",
-        X_valid_processed.shape
-    )
+    print("Processed validation shape:", X_valid_processed.shape)
 
     # ---------------------------------------------------------
     # Class imbalance
@@ -225,14 +151,9 @@ def main():
     negative_count = (y_train == 0).sum()
     positive_count = (y_train == 1).sum()
 
-    scale_pos_weight = (
-        negative_count / positive_count
-    )
+    scale_pos_weight = negative_count / positive_count
 
-    print(
-        f"\nscale_pos_weight: "
-        f"{scale_pos_weight:.4f}"
-    )
+    print(f"\nscale_pos_weight: " f"{scale_pos_weight:.4f}")
 
     # ---------------------------------------------------------
     # Regularized XGBoost
@@ -242,22 +163,15 @@ def main():
         n_estimators=1000,
         max_depth=4,
         learning_rate=0.05,
-
         min_child_weight=10,
-
         subsample=0.8,
         colsample_bytree=0.7,
-
         gamma=0.1,
-
         reg_alpha=0.1,
         reg_lambda=2.0,
-
         objective="binary:logistic",
         eval_metric="aucpr",
-
         scale_pos_weight=scale_pos_weight,
-
         tree_method="hist",
         n_jobs=-1,
         random_state=42,
@@ -269,12 +183,7 @@ def main():
     model.fit(
         X_train_processed,
         y_train,
-        eval_set=[
-            (
-                X_valid_processed,
-                y_valid
-            )
-        ],
+        eval_set=[(X_valid_processed, y_valid)],
         verbose=50,
     )
 
@@ -282,48 +191,23 @@ def main():
     # Evaluation
     # ---------------------------------------------------------
 
-    evaluate_model(
-        model,
-        X_train_processed,
-        y_train,
-        "TRAINING RESULTS"
-    )
+    evaluate_model(model, X_train_processed, y_train, "TRAINING RESULTS")
 
-    evaluate_model(
-        model,
-        X_valid_processed,
-        y_valid,
-        "VALIDATION RESULTS"
-    )
+    evaluate_model(model, X_valid_processed, y_valid, "VALIDATION RESULTS")
 
     # ---------------------------------------------------------
     # Save
     # ---------------------------------------------------------
 
-    MODEL_DIR.mkdir(
-        parents=True,
-        exist_ok=True
-    )
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
-    model_path = (
-        MODEL_DIR
-        / "xgboost_tuned_model.joblib"
-    )
+    model_path = MODEL_DIR / "xgboost_tuned_model.joblib"
 
-    preprocessor_path = (
-        MODEL_DIR
-        / "xgboost_tuned_preprocessor.joblib"
-    )
+    preprocessor_path = MODEL_DIR / "xgboost_tuned_preprocessor.joblib"
 
-    joblib.dump(
-        model,
-        model_path
-    )
+    joblib.dump(model, model_path)
 
-    joblib.dump(
-        preprocessor,
-        preprocessor_path
-    )
+    joblib.dump(preprocessor, preprocessor_path)
 
     print("\n" + "=" * 70)
     print("MODEL SAVED")

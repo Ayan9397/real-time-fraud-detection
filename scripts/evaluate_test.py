@@ -2,7 +2,6 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-
 from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
@@ -12,16 +11,11 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
-
 TEST_FILE = Path("data/processed/test.csv")
 
-MODEL_FILE = Path(
-    "models/xgboost_missing_model.joblib"
-)
+MODEL_FILE = Path("models/xgboost_missing_model.joblib")
 
-PREPROCESSOR_FILE = Path(
-    "models/xgboost_missing_preprocessor.joblib"
-)
+PREPROCESSOR_FILE = Path("models/xgboost_missing_preprocessor.joblib")
 
 TARGET = "isFraud"
 ID_COLUMN = "TransactionID"
@@ -29,9 +23,7 @@ ID_COLUMN = "TransactionID"
 
 def evaluate_threshold(y_true, probabilities, threshold):
 
-    predictions = (
-        probabilities >= threshold
-    ).astype(int)
+    predictions = (probabilities >= threshold).astype(int)
 
     precision = precision_score(
         y_true,
@@ -57,8 +49,6 @@ def evaluate_threshold(y_true, probabilities, threshold):
     )
 
     tn, fp, fn, tp = matrix.ravel()
-
-    total = len(y_true)
 
     false_positive_rate = fp / (fp + tn)
 
@@ -89,9 +79,7 @@ def main():
     print("FINAL TEST EVALUATION")
     print("=" * 70)
 
-    print(
-        "\nIMPORTANT: This is the final unseen test evaluation."
-    )
+    print("\nIMPORTANT: This is the final unseen test evaluation.")
 
     # ---------------------------------------------------------
     # Load test data
@@ -99,9 +87,7 @@ def main():
 
     print("\nLoading test dataset...")
 
-    test_df = pd.read_csv(
-        TEST_FILE
-    )
+    test_df = pd.read_csv(TEST_FILE)
 
     print(
         "Test shape:",
@@ -133,19 +119,11 @@ def main():
     # Create missingness indicators
     # ---------------------------------------------------------
 
-    print(
-        "\nCreating missingness indicators..."
-    )
+    print("\nCreating missingness indicators...")
 
-    missing_test = (
-        X_test.isna()
-        .astype("int8")
-    )
+    missing_test = X_test.isna().astype("int8")
 
-    missing_test.columns = [
-        f"{column}_missing"
-        for column in missing_test.columns
-    ]
+    missing_test.columns = [f"{column}_missing" for column in missing_test.columns]
 
     X_test = pd.concat(
         [
@@ -164,31 +142,19 @@ def main():
     # Load model
     # ---------------------------------------------------------
 
-    print(
-        "\nLoading champion model..."
-    )
+    print("\nLoading champion model...")
 
-    model = joblib.load(
-        MODEL_FILE
-    )
+    model = joblib.load(MODEL_FILE)
 
-    preprocessor = joblib.load(
-        PREPROCESSOR_FILE
-    )
+    preprocessor = joblib.load(PREPROCESSOR_FILE)
 
     # ---------------------------------------------------------
     # Transform
     # ---------------------------------------------------------
 
-    print(
-        "Transforming test data..."
-    )
+    print("Transforming test data...")
 
-    X_test_processed = (
-        preprocessor.transform(
-            X_test
-        )
-    )
+    X_test_processed = preprocessor.transform(X_test)
 
     print(
         "Processed test shape:",
@@ -199,13 +165,9 @@ def main():
     # Generate probabilities
     # ---------------------------------------------------------
 
-    print(
-        "\nGenerating predictions..."
-    )
+    print("\nGenerating predictions...")
 
-    probabilities = model.predict_proba(
-        X_test_processed
-    )[:, 1]
+    probabilities = model.predict_proba(X_test_processed)[:, 1]
 
     # ---------------------------------------------------------
     # Threshold-independent metrics
@@ -225,13 +187,9 @@ def main():
     print("THRESHOLD-INDEPENDENT TEST METRICS")
     print("=" * 70)
 
-    print(
-        f"ROC-AUC: {roc_auc:.4f}"
-    )
+    print(f"ROC-AUC: {roc_auc:.4f}")
 
-    print(
-        f"PR-AUC:  {pr_auc:.4f}"
-    )
+    print(f"PR-AUC:  {pr_auc:.4f}")
 
     # ---------------------------------------------------------
     # Evaluate selected thresholds
@@ -259,17 +217,13 @@ def main():
 
     predictions_df = pd.DataFrame(
         {
-            "TransactionID": test_df[
-                ID_COLUMN
-            ],
+            "TransactionID": test_df[ID_COLUMN],
             "actual_isFraud": y_test,
             "fraud_probability": probabilities,
         }
     )
 
-    predictions_file = Path(
-        "models/test_predictions.csv"
-    )
+    predictions_file = Path("models/test_predictions.csv")
 
     predictions_df.to_csv(
         predictions_file,
@@ -280,9 +234,7 @@ def main():
     print("TEST PREDICTIONS SAVED")
     print("=" * 70)
 
-    print(
-        f"File: {predictions_file}"
-    )
+    print(f"File: {predictions_file}")
 
     print("\nFinal test evaluation complete.")
 

@@ -2,7 +2,6 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
@@ -15,9 +14,7 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
-
 from xgboost import XGBClassifier
-
 
 TRAIN_FILE = Path("data/processed/train.csv")
 VALID_FILE = Path("data/processed/valid.csv")
@@ -76,13 +73,9 @@ def main():
     y_train = train_df[TARGET]
     y_valid = valid_df[TARGET]
 
-    X_train = train_df.drop(
-        columns=[TARGET, ID_COLUMN]
-    ).copy()
+    X_train = train_df.drop(columns=[TARGET, ID_COLUMN]).copy()
 
-    X_valid = valid_df.drop(
-        columns=[TARGET, ID_COLUMN]
-    ).copy()
+    X_valid = valid_df.drop(columns=[TARGET, ID_COLUMN]).copy()
 
     print("\nTarget distribution:")
     print(y_train.value_counts())
@@ -91,13 +84,9 @@ def main():
     # Identify original feature types
     # ---------------------------------------------------------
 
-    numeric_features = X_train.select_dtypes(
-        include=["number"]
-    ).columns.tolist()
+    numeric_features = X_train.select_dtypes(include=["number"]).columns.tolist()
 
-    categorical_features = X_train.select_dtypes(
-        exclude=["number"]
-    ).columns.tolist()
+    categorical_features = X_train.select_dtypes(exclude=["number"]).columns.tolist()
 
     print("\nOriginal numeric features:", len(numeric_features))
     print(
@@ -118,15 +107,9 @@ def main():
     missing_train = X_train.isna().astype("int8")
     missing_valid = X_valid.isna().astype("int8")
 
-    missing_train.columns = [
-        f"{column}_missing"
-        for column in missing_train.columns
-    ]
+    missing_train.columns = [f"{column}_missing" for column in missing_train.columns]
 
-    missing_valid.columns = [
-        f"{column}_missing"
-        for column in missing_valid.columns
-    ]
+    missing_valid.columns = [f"{column}_missing" for column in missing_valid.columns]
 
     X_train = pd.concat(
         [X_train, missing_train],
@@ -141,9 +124,7 @@ def main():
     # Missing indicators are all numeric.
     missing_features = missing_train.columns.tolist()
 
-    numeric_features_extended = (
-        numeric_features + missing_features
-    )
+    numeric_features_extended = numeric_features + missing_features
 
     print(
         "Features after indicators:",
@@ -168,9 +149,7 @@ def main():
         steps=[
             (
                 "imputer",
-                SimpleImputer(
-                    strategy="median"
-                ),
+                SimpleImputer(strategy="median"),
             )
         ]
     )
@@ -183,9 +162,7 @@ def main():
         steps=[
             (
                 "imputer",
-                SimpleImputer(
-                    strategy="most_frequent"
-                ),
+                SimpleImputer(strategy="most_frequent"),
             ),
             (
                 "encoder",
@@ -219,13 +196,9 @@ def main():
 
     print("\nFitting preprocessing pipeline...")
 
-    X_train_processed = preprocessor.fit_transform(
-        X_train
-    )
+    X_train_processed = preprocessor.fit_transform(X_train)
 
-    X_valid_processed = preprocessor.transform(
-        X_valid
-    )
+    X_valid_processed = preprocessor.transform(X_valid)
 
     print(
         "Processed train shape:",
@@ -248,12 +221,8 @@ def main():
         X_train_processed.dtype,
     )
 
-    if not pd.api.types.is_numeric_dtype(
-        X_train_processed.dtype
-    ):
-        raise TypeError(
-            "Processed matrix is not numeric."
-        )
+    if not pd.api.types.is_numeric_dtype(X_train_processed.dtype):
+        raise TypeError("Processed matrix is not numeric.")
 
     print("Numeric matrix check: PASSED")
 
@@ -264,14 +233,9 @@ def main():
     negative_count = (y_train == 0).sum()
     positive_count = (y_train == 1).sum()
 
-    scale_pos_weight = (
-        negative_count / positive_count
-    )
+    scale_pos_weight = negative_count / positive_count
 
-    print(
-        f"\nscale_pos_weight: "
-        f"{scale_pos_weight:.4f}"
-    )
+    print(f"\nscale_pos_weight: " f"{scale_pos_weight:.4f}")
 
     # ---------------------------------------------------------
     # XGBoost
@@ -338,15 +302,9 @@ def main():
         exist_ok=True,
     )
 
-    model_path = (
-        MODEL_DIR
-        / "xgboost_missing_model.joblib"
-    )
+    model_path = MODEL_DIR / "xgboost_missing_model.joblib"
 
-    preprocessor_path = (
-        MODEL_DIR
-        / "xgboost_missing_preprocessor.joblib"
-    )
+    preprocessor_path = MODEL_DIR / "xgboost_missing_preprocessor.joblib"
 
     joblib.dump(
         model,

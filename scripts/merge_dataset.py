@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 RAW_DATA_DIR = Path("data/raw")
 PROCESSED_DATA_DIR = Path("data/processed")
 
@@ -36,14 +35,10 @@ def merge_datasets() -> None:
     print("=" * 70)
 
     if transactions["TransactionID"].duplicated().any():
-        raise ValueError(
-            "Duplicate TransactionID found in transaction data."
-        )
+        raise ValueError("Duplicate TransactionID found in transaction data.")
 
     if identity["TransactionID"].duplicated().any():
-        raise ValueError(
-            "Duplicate TransactionID found in identity data."
-        )
+        raise ValueError("Duplicate TransactionID found in identity data.")
 
     print("TransactionID integrity check passed.")
 
@@ -71,7 +66,9 @@ def merge_datasets() -> None:
     coverage = identity_matches / total_transactions * 100
 
     print(f"Transactions with identity data: {identity_matches:,}")
-    print(f"Transactions without identity data: {total_transactions - identity_matches:,}")
+    print(
+        f"Transactions without identity data: {total_transactions - identity_matches:,}"
+    )
     print(f"Identity coverage: {coverage:.2f}%")
 
     print("\n" + "=" * 70)
@@ -80,16 +77,10 @@ def merge_datasets() -> None:
 
     print("Target distribution after merge:")
 
-    print(
-        merged["isFraud"]
-        .value_counts()
-        .sort_index()
-    )
+    print(merged["isFraud"].value_counts().sort_index())
 
     if len(merged) != len(transactions):
-        raise ValueError(
-            "Transaction row count changed after merge."
-        )
+        raise ValueError("Transaction row count changed after merge.")
 
     print("\nTransaction row count preserved.")
 

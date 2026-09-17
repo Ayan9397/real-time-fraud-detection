@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -12,9 +12,7 @@ class FraudTransactionRequest(BaseModel):
     beyond the commonly used core fields.
     """
 
-    model_config = ConfigDict(
-        extra="allow"
-    )
+    model_config = ConfigDict(extra="allow")
 
     TransactionID: int | None = None
     TransactionDT: float
@@ -38,7 +36,7 @@ class FraudTransactionRequest(BaseModel):
     P_emaildomain: str | None = None
     R_emaildomain: str | None = None
 
-    def to_transaction_dict(self) -> Dict[str, Any]:
+    def to_transaction_dict(self) -> dict[str, Any]:
         """
         Convert the request into a dictionary containing both
         explicitly defined and additional transaction fields.

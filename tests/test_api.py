@@ -2,7 +2,6 @@ from fastapi.testclient import TestClient
 
 from api.main import app
 
-
 client = TestClient(app)
 
 
@@ -15,7 +14,7 @@ def test_health_endpoint():
 
     assert data["status"] in {"healthy", "degraded"}
     assert data["model"] == "fraud_detection_xgboost"
-    assert data["model_version"] == "4"
+    assert data["model_version"] == "6"
     assert data["expected_features"] == 864
     assert "database" in data
     assert "redis" in data

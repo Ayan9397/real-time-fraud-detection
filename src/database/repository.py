@@ -1,14 +1,12 @@
-from decimal import Decimal
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.database.models import FraudPrediction, Transaction
 
-
 # ---------------------------------------------------------
 # Transaction operations
 # ---------------------------------------------------------
+
 
 def create_transaction(
     db: Session,
@@ -35,9 +33,7 @@ def get_transaction(
     Retrieve a transaction by TransactionID.
     """
 
-    statement = select(Transaction).where(
-        Transaction.transaction_id == transaction_id
-    )
+    statement = select(Transaction).where(Transaction.transaction_id == transaction_id)
 
     return db.scalar(statement)
 
@@ -45,6 +41,7 @@ def get_transaction(
 # ---------------------------------------------------------
 # Fraud prediction operations
 # ---------------------------------------------------------
+
 
 def create_prediction(
     db: Session,
@@ -84,6 +81,7 @@ def get_predictions_for_transaction(
 # Recent predictions
 # ---------------------------------------------------------
 
+
 def get_recent_predictions(
     db: Session,
     limit: int = 20,
@@ -93,9 +91,7 @@ def get_recent_predictions(
     """
 
     statement = (
-        select(FraudPrediction)
-        .order_by(FraudPrediction.created_at.desc())
-        .limit(limit)
+        select(FraudPrediction).order_by(FraudPrediction.created_at.desc()).limit(limit)
     )
 
     return list(db.scalars(statement).all())

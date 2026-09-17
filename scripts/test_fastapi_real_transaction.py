@@ -1,10 +1,9 @@
-from pathlib import Path
 import json
-import urllib.request
 import urllib.error
+import urllib.request
+from pathlib import Path
 
 import pandas as pd
-
 
 # ============================================================
 # PROJECT PATHS
@@ -12,12 +11,7 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-VALIDATION_DATA = (
-    PROJECT_ROOT
-    / "data"
-    / "processed"
-    / "valid.csv"
-)
+VALIDATION_DATA = PROJECT_ROOT / "data" / "processed" / "valid.csv"
 
 
 # ============================================================
@@ -37,6 +31,7 @@ TOLERANCE = 0.00001
 # MAIN
 # ============================================================
 
+
 def main():
 
     print("=" * 70)
@@ -50,9 +45,7 @@ def main():
     print("\nLoading validation dataset...")
 
     if not VALIDATION_DATA.exists():
-        raise FileNotFoundError(
-            f"Validation dataset not found: {VALIDATION_DATA}"
-        )
+        raise FileNotFoundError(f"Validation dataset not found: {VALIDATION_DATA}")
 
     df = pd.read_csv(VALIDATION_DATA)
 
@@ -62,57 +55,37 @@ def main():
     # Find target transaction
     # --------------------------------------------------------
 
-    transaction_rows = df[
-        df["TransactionID"] == TRANSACTION_ID
-    ]
+    transaction_rows = df[df["TransactionID"] == TRANSACTION_ID]
 
     if transaction_rows.empty:
         raise ValueError(
-            f"TransactionID {TRANSACTION_ID} "
-            "was not found in valid.csv."
+            f"TransactionID {TRANSACTION_ID} " "was not found in valid.csv."
         )
 
     if len(transaction_rows) > 1:
-        raise ValueError(
-            f"TransactionID {TRANSACTION_ID} "
-            "appears more than once."
-        )
+        raise ValueError(f"TransactionID {TRANSACTION_ID} " "appears more than once.")
 
     transaction = transaction_rows.iloc[0]
 
     print("\nTransaction found.")
 
-    print(
-        "TransactionID:",
-        transaction["TransactionID"]
-    )
+    print("TransactionID:", transaction["TransactionID"])
 
-    print(
-        "Actual isFraud:",
-        transaction["isFraud"]
-    )
+    print("Actual isFraud:", transaction["isFraud"])
 
-    print(
-        "TransactionAmt:",
-        transaction["TransactionAmt"]
-    )
+    print("TransactionAmt:", transaction["TransactionAmt"])
 
     # --------------------------------------------------------
     # Convert row to JSON-compatible dictionary
     # --------------------------------------------------------
 
-    payload_df = pd.DataFrame(
-        [transaction.drop(labels=["isFraud"])]
-    )
+    payload_df = pd.DataFrame([transaction.drop(labels=["isFraud"])])
 
     # Convert NaN values to None so they become JSON null.
 
     payload_df = payload_df.astype(object)
 
-    payload_df = payload_df.where(
-        pd.notna(payload_df),
-        None
-    )
+    payload_df = payload_df.where(pd.notna(payload_df), None)
 
     payload = payload_df.iloc[0].to_dict()
 
@@ -129,15 +102,9 @@ def main():
     # Display payload information
     # --------------------------------------------------------
 
-    print(
-        "\nFeatures being sent to FastAPI:",
-        len(payload)
-    )
+    print("\nFeatures being sent to FastAPI:", len(payload))
 
-    print(
-        "Expected original model features:",
-        432
-    )
+    print("Expected original model features:", 432)
 
     # --------------------------------------------------------
     # Send HTTP request
@@ -145,39 +112,26 @@ def main():
 
     print("\nSending complete transaction to FastAPI...")
 
-    request_body = json.dumps(
-        payload
-    ).encode("utf-8")
+    request_body = json.dumps(payload).encode("utf-8")
 
     request = urllib.request.Request(
         API_URL,
         data=request_body,
-        headers={
-            "Content-Type": "application/json"
-        },
+        headers={"Content-Type": "application/json"},
         method="POST",
     )
 
     try:
 
-        with urllib.request.urlopen(
-            request,
-            timeout=120
-        ) as response:
+        with urllib.request.urlopen(request, timeout=120) as response:
 
-            response_body = (
-                response.read()
-                .decode("utf-8")
-            )
+            response_body = response.read().decode("utf-8")
 
             status_code = response.status
 
     except urllib.error.HTTPError as exc:
 
-        error_body = (
-            exc.read()
-            .decode("utf-8")
-        )
+        error_body = exc.read().decode("utf-8")
 
         print("\nFastAPI returned an error.")
 
@@ -191,17 +145,14 @@ def main():
     except urllib.error.URLError as exc:
 
         raise RuntimeError(
-            "Could not connect to FastAPI. "
-            "Make sure Uvicorn is running."
+            "Could not connect to FastAPI. " "Make sure Uvicorn is running."
         ) from exc
 
     # --------------------------------------------------------
     # Parse response
     # --------------------------------------------------------
 
-    result = json.loads(
-        response_body
-    )
+    result = json.loads(response_body)
 
     # --------------------------------------------------------
     # Display response
@@ -210,56 +161,33 @@ def main():
     print("\nFastAPI response:")
     print("-" * 70)
 
-    print(
-        json.dumps(
-            result,
-            indent=2
-        )
-    )
+    print(json.dumps(result, indent=2))
 
     # --------------------------------------------------------
     # Extract prediction
     # --------------------------------------------------------
 
-    api_probability = float(
-        result["fraud_probability"]
-    )
+    api_probability = float(result["fraud_probability"])
 
-    api_prediction = int(
-        result["fraud_prediction"]
-    )
+    api_prediction = int(result["fraud_prediction"])
 
-    api_decision = str(
-        result["decision"]
-    )
+    api_decision = str(result["decision"])
 
     # --------------------------------------------------------
     # Compare with expected MLflow result
     # --------------------------------------------------------
 
-    probability_difference = abs(
-        api_probability
-        - EXPECTED_MLFLOW_PROBABILITY
-    )
+    probability_difference = abs(api_probability - EXPECTED_MLFLOW_PROBABILITY)
 
     print("\n" + "=" * 70)
     print("MODEL CONSISTENCY CHECK")
     print("=" * 70)
 
-    print(
-        "\nExpected MLflow probability:",
-        EXPECTED_MLFLOW_PROBABILITY
-    )
+    print("\nExpected MLflow probability:", EXPECTED_MLFLOW_PROBABILITY)
 
-    print(
-        "FastAPI probability:",
-        api_probability
-    )
+    print("FastAPI probability:", api_probability)
 
-    print(
-        "Absolute difference:",
-        probability_difference
-    )
+    print("Absolute difference:", probability_difference)
 
     # --------------------------------------------------------
     # Verify probability
@@ -267,15 +195,11 @@ def main():
 
     if probability_difference <= TOLERANCE:
 
-        print(
-            "\nProbability consistency: PASSED"
-        )
+        print("\nProbability consistency: PASSED")
 
     else:
 
-        print(
-            "\nProbability consistency: FAILED"
-        )
+        print("\nProbability consistency: FAILED")
 
         print(
             "\nThe FastAPI prediction does not match "
@@ -283,8 +207,7 @@ def main():
         )
 
         raise AssertionError(
-            "FastAPI and MLflow probabilities differ "
-            "beyond the allowed tolerance."
+            "FastAPI and MLflow probabilities differ " "beyond the allowed tolerance."
         )
 
     # --------------------------------------------------------
@@ -293,66 +216,39 @@ def main():
 
     if api_prediction != 1:
 
-        raise AssertionError(
-            "Expected fraud_prediction=1."
-        )
+        raise AssertionError("Expected fraud_prediction=1.")
 
     if api_decision != "FRAUD REVIEW":
 
-        raise AssertionError(
-            "Expected decision='FRAUD REVIEW'."
-        )
+        raise AssertionError("Expected decision='FRAUD REVIEW'.")
 
     if int(transaction["isFraud"]) != 1:
 
-        raise AssertionError(
-            "Expected actual transaction label to be fraud."
-        )
+        raise AssertionError("Expected actual transaction label to be fraud.")
 
     # --------------------------------------------------------
     # Final result
     # --------------------------------------------------------
 
-    print(
-        "Prediction consistency: PASSED"
-    )
+    print("Prediction consistency: PASSED")
 
-    print(
-        "Decision consistency: PASSED"
-    )
+    print("Decision consistency: PASSED")
 
-    print(
-        "Actual fraud label: PASSED"
-    )
+    print("Actual fraud label: PASSED")
 
     print("\n" + "=" * 70)
     print("FASTAPI END-TO-END VALIDATION PASSED")
     print("=" * 70)
 
-    print(
-        "\nOffline MLflow result and FastAPI result "
-        "are consistent."
-    )
+    print("\nOffline MLflow result and FastAPI result " "are consistent.")
 
-    print(
-        "\nHTTP status:",
-        status_code
-    )
+    print("\nHTTP status:", status_code)
 
-    print(
-        "Transaction:",
-        TRANSACTION_ID
-    )
+    print("Transaction:", TRANSACTION_ID)
 
-    print(
-        "Fraud probability:",
-        api_probability
-    )
+    print("Fraud probability:", api_probability)
 
-    print(
-        "Decision:",
-        api_decision
-    )
+    print("Decision:", api_decision)
 
     print("=" * 70)
 

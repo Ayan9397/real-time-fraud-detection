@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 RAW_DATA_DIR = Path("data/raw")
 
 TRANSACTION_FILE = RAW_DATA_DIR / "train_transaction.csv"
@@ -65,10 +64,7 @@ def inspect_target() -> None:
 
         label = "Fraud" if value == 1 else "Legitimate"
 
-        print(
-            f"{label}: {count:,} "
-            f"({percentage:.4f}%)"
-        )
+        print(f"{label}: {count:,} " f"({percentage:.4f}%)")
 
     print(f"\nTotal transactions: {total:,}")
 

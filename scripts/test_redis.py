@@ -1,7 +1,6 @@
 from src.cache.fraud_cache import FraudCache
 from src.cache.redis_client import RedisClient
 
-
 TEST_TRANSACTION_ID = 999999997
 
 
@@ -45,19 +44,11 @@ def main() -> None:
         print("   PASS: Cache key exists.")
 
         print("\n4. Reading prediction from Redis...")
-        cached_prediction = fraud_cache.get_prediction(
-            TEST_TRANSACTION_ID
-        )
+        cached_prediction = fraud_cache.get_prediction(TEST_TRANSACTION_ID)
 
         assert cached_prediction is not None
-        assert (
-            cached_prediction["fraud_probability"]
-            == prediction["fraud_probability"]
-        )
-        assert (
-            cached_prediction["decision"]
-            == prediction["decision"]
-        )
+        assert cached_prediction["fraud_probability"] == prediction["fraud_probability"]
+        assert cached_prediction["decision"] == prediction["decision"]
 
         print("   PASS: Cached prediction matches original.")
 
@@ -68,17 +59,13 @@ def main() -> None:
         print(f"   PASS: TTL = {ttl} seconds.")
 
         print("\n6. Deleting cache entry...")
-        deleted = fraud_cache.delete_prediction(
-            TEST_TRANSACTION_ID
-        )
+        deleted = fraud_cache.delete_prediction(TEST_TRANSACTION_ID)
 
         assert deleted == 1
         print("   PASS: Cache entry deleted.")
 
         print("\n7. Confirming deletion...")
-        assert not fraud_cache.prediction_exists(
-            TEST_TRANSACTION_ID
-        )
+        assert not fraud_cache.prediction_exists(TEST_TRANSACTION_ID)
         print("   PASS: Cache entry no longer exists.")
 
         print("\n" + "=" * 60)
