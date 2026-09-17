@@ -1,0 +1,12 @@
+aws_region          = "us-east-1"
+environment         = "production"
+project_name        = "fraud-detection"
+vpc_cidr            = "10.0.0.0/16"
+eks_cluster_version = "1.30"
+db_instance_class   = "db.t4g.large"
+db_allocated_storage = 50
+db_name             = "fraud_detection"
+db_username         = "fraud_admin"
+db_password         = "REPLACE_WITH_SECURE_PASSWORD"
+redis_node_type     = "cache.t4g.medium"
+

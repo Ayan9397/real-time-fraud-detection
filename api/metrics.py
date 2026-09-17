@@ -63,4 +63,3 @@ CACHE_REQUESTS_TOTAL = Counter(
     "Total Redis cache prediction lookups categorized by hit or miss.",
     ["result"],
 )
-
