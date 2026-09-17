@@ -212,18 +212,14 @@ with tab1:
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Scored Transactions", f"{total_txns:,}")
-    col2.metric(
-        "Flagged Fraud", f"{fraud_txns:,}", delta=f"{fraud_rate:.1f}% rate"
-    )
+    col2.metric("Flagged Fraud", f"{fraud_txns:,}", delta=f"{fraud_rate:.1f}% rate")
     col3.metric(
         "Avg Inference Latency",
         f"{avg_latency:.1f} ms",
         delta="Target < 50ms",
         delta_color="inverse",
     )
-    col4.metric(
-        "Model Decision Threshold", "0.200", help="Tuned via F1 optimization"
-    )
+    col4.metric("Model Decision Threshold", "0.200", help="Tuned via F1 optimization")
 
     st.subheader("Recent Transaction Activity")
 
@@ -233,9 +229,7 @@ with tab1:
             "Filter by Decision:", ["All", "Fraud Only", "Legitimate Only"]
         )
     with col_filter2:
-        search_id = st.text_input(
-            "Search TransactionID:", placeholder="e.g. 3001001"
-        )
+        search_id = st.text_input("Search TransactionID:", placeholder="e.g. 3001001")
 
     filtered_df = df.copy()
     if decision_filter == "Fraud Only":
@@ -350,12 +344,8 @@ with tab3:
         col_s1, col_s2, col_s3 = st.columns(3)
 
         with col_s1:
-            test_id = st.number_input(
-                "TransactionID", value=int(time.time()), step=1
-            )
-            test_amt = st.number_input(
-                "Transaction Amount ($)", value=250.0, step=10.0
-            )
+            test_id = st.number_input("TransactionID", value=int(time.time()), step=1)
+            test_amt = st.number_input("Transaction Amount ($)", value=250.0, step=10.0)
             test_product = st.selectbox(
                 "Product Code (ProductCD)", ["W", "H", "C", "S", "R"]
             )
@@ -368,9 +358,7 @@ with tab3:
                 "Card Network (card4)",
                 ["visa", "mastercard", "discover", "american express"],
             )
-            test_card6 = st.selectbox(
-                "Card Type (card6)", ["debit", "credit"]
-            )
+            test_card6 = st.selectbox("Card Type (card6)", ["debit", "credit"])
 
         with col_s3:
             test_addr1 = st.number_input("Billing Zip / Region (addr1)", value=315)

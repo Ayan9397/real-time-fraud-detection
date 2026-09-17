@@ -1,6 +1,5 @@
 import time
 
-from fastapi import Depends, FastAPI, HTTPException
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
